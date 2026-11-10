@@ -264,6 +264,9 @@ class _MainScreenState extends State<MainScreen> {
   final List<_CountdownTimer> _countdowns=[];
   Timer? _countdownTicker;
   int _wheelHours=0, _wheelMinutes=5, _wheelSeconds=0, _nextCountdownId=1000;
+  bool _countdownAlarmEnabled = true;
+  bool _countdownAlarmSound = true;
+  bool _countdownAlarmVibration = true;
   Timer? _clock;
   final List<_RunningActivity> _runningActivities = [];
   List<_SavedActivity> _savedActivities = [];
@@ -279,6 +282,7 @@ class _MainScreenState extends State<MainScreen> {
     });
     _initializeData();
     _loadChecklists();
+    _loadCountdownAlarmSettings();
     _initializeAlarmNotifications();
     _countdownTicker=Timer.periodic(const Duration(seconds:1), (_) => _tickCountdowns());
   }
@@ -1238,12 +1242,37 @@ class _MainScreenState extends State<MainScreen> {
       description:'هشدار صوتی هنگام پایان تایمر معکوس',importance:Importance.max,playSound:true,enableVibration:true);
     await android?.createNotificationChannel(channel);
   }
-  NotificationDetails get _alarmDetails => const NotificationDetails(android:AndroidNotificationDetails(
-    'countdown_alarm_channel','هشدار پایان تایمر',channelDescription:'هشدار صوتی هنگام پایان تایمر معکوس',
-    importance:Importance.max,priority:Priority.max,playSound:true,enableVibration:true,
+  Future<void> _loadCountdownAlarmSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _countdownAlarmEnabled = prefs.getBool('countdown_alarm_enabled') ?? true;
+      _countdownAlarmSound = prefs.getBool('countdown_alarm_sound') ?? true;
+      _countdownAlarmVibration = prefs.getBool('countdown_alarm_vibration') ?? true;
+    });
+  }
+
+  Future<void> _saveCountdownAlarmSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('countdown_alarm_enabled', _countdownAlarmEnabled);
+    await prefs.setBool('countdown_alarm_sound', _countdownAlarmSound);
+    await prefs.setBool('countdown_alarm_vibration', _countdownAlarmVibration);
+    if (!_countdownAlarmEnabled) {
+      for (final item in _countdowns) { await _notifications.cancel(item.id); }
+    } else {
+      for (final item in _countdowns.where((item) => item.running)) {
+        await _scheduleCountdownAlarm(item);
+      }
+    }
+  }
+
+  NotificationDetails get _alarmDetails => NotificationDetails(android:AndroidNotificationDetails(
+    'countdown_alarm_channel','هشدار پایان تایمر',channelDescription:'هشدار هنگام پایان تایمر معکوس',
+    importance:Importance.max,priority:Priority.max,playSound:_countdownAlarmSound,
+    enableVibration:_countdownAlarmVibration,
     category:AndroidNotificationCategory.alarm,audioAttributesUsage:AudioAttributesUsage.alarm));
   Future<void> _scheduleCountdownAlarm(_CountdownTimer item) async {
-    if(item.endsAt==null)return;
+    if(item.endsAt==null || !_countdownAlarmEnabled)return;
     await _notifications.zonedSchedule(item.id,'زمان تایمر به پایان رسید',item.title,
       tz.TZDateTime.from(item.endsAt!,tz.local),_alarmDetails,
       androidScheduleMode:AndroidScheduleMode.exactAllowWhileIdle,payload:'countdown:'+item.id.toString());
@@ -1261,8 +1290,10 @@ class _MainScreenState extends State<MainScreen> {
   }
   Future<void> _finishCountdown(_CountdownTimer item) async {
     await _notifications.cancel(item.id);
-    await _notifications.show(item.id,'پایان تایمر','زمان «'+item.title+'» به پایان رسید.',_alarmDetails,payload:'countdown:'+item.id.toString());
-    SystemSound.play(SystemSoundType.alert);
+    if (_countdownAlarmEnabled) {
+      await _notifications.show(item.id,'پایان تایمر','زمان «'+item.title+'» به پایان رسید.',_alarmDetails,payload:'countdown:'+item.id.toString());
+      if (_countdownAlarmSound) SystemSound.play(SystemSoundType.alert);
+    }
   }
   void _addCountdown(){
     final seconds=_wheelHours*3600+_wheelMinutes*60+_wheelSeconds;
@@ -1341,6 +1372,35 @@ class _MainScreenState extends State<MainScreen> {
           const SizedBox(height:12),
           SizedBox(width:double.infinity,child:FilledButton.icon(onPressed:_addCountdown,icon:const Icon(Icons.add_alarm),
             label:const Text('افزودن تایمر'),style:FilledButton.styleFrom(backgroundColor:_accentColor))),
+          const SizedBox(height:14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal:12, vertical:6),
+            decoration: BoxDecoration(color:const Color(0xFFF7F8FC),borderRadius:BorderRadius.circular(14)),
+            child: Column(children:[
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('هشدار پس از اتمام تایمر',style:TextStyle(fontWeight:FontWeight.w600)),
+                subtitle: const Text('پس از صفر شدن زمان، اعلان هشدار نمایش داده شود.'),
+                value:_countdownAlarmEnabled, activeColor:_accentColor,
+                onChanged:(v) async { setState(()=>_countdownAlarmEnabled=v); await _saveCountdownAlarmSettings(); },
+              ),
+              if (_countdownAlarmEnabled) ...[
+                const Divider(height:1),
+                SwitchListTile(
+                  contentPadding:EdgeInsets.zero, title:const Text('صدای هشدار'),
+                  secondary:const Icon(Icons.volume_up_outlined),
+                  value:_countdownAlarmSound, activeColor:_accentColor,
+                  onChanged:(v) async { setState(()=>_countdownAlarmSound=v); await _saveCountdownAlarmSettings(); },
+                ),
+                SwitchListTile(
+                  contentPadding:EdgeInsets.zero, title:const Text('لرزش هنگام هشدار'),
+                  secondary:const Icon(Icons.vibration),
+                  value:_countdownAlarmVibration, activeColor:_accentColor,
+                  onChanged:(v) async { setState(()=>_countdownAlarmVibration=v); await _saveCountdownAlarmSettings(); },
+                ),
+              ],
+            ]),
+          ),
         ])),
       const SizedBox(height:22),
       Row(children:[const Expanded(child:Text('تایمرهای من',style:TextStyle(fontSize:19,fontWeight:FontWeight.bold))),
