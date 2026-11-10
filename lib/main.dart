@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
@@ -1578,7 +1579,7 @@ class _MainScreenState extends State<MainScreen> {
       fileName: 'checklist_${safeName}_${exportedAt.millisecondsSinceEpoch}.xlsx',
       type: FileType.custom,
       allowedExtensions: ['xlsx'],
-      bytes: bytes,
+      bytes: Uint8List.fromList(bytes),
     );
     if (path != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
