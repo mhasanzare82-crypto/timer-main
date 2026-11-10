@@ -1655,6 +1655,569 @@ class _MainScreenState extends State<MainScreen> {
     return value.trim();
   }
 
+  Future<void> _importChecklistTxt() async {
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['txt'],
+      withData: true,
+    );
+    if (picked == null || picked.files.single.bytes == null || !mounted) return;
+
+    try {
+      var content = utf8.decode(picked.files.single.bytes!, allowMalformed: true);
+      content = content.replaceFirst('\uFEFF', '');
+      final items = content
+          .split(RegExp(r'\r?\n'))
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty)
+          .toList();
+
+      if (items.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('فایل انتخاب‌شده موردی برای وارد کردن ندارد.')),
+        );
+        return;
+      }
+
+      final fileName = picked.files.single.name.replaceFirst(RegExp(r'\.txt
+    final name = await _askChecklistText(title: 'چک‌لیست جدید', hint: 'مثلاً برنامه روزانه');
+    if (name == null || !mounted) return;
+    setState(() => _checklists.insert(0, _Checklist(
+      id: DateTime.now().microsecondsSinceEpoch.toString(), title: name)));
+    await _persistChecklists();
+  }
+
+  Future<void> _addChecklistItem(_Checklist list) async {
+    final text = await _askChecklistText(title: 'افزودن مورد', hint: 'عنوان مورد چک‌لیست');
+    if (text == null || !mounted) return;
+    setState(() => list.items.add(_ChecklistItem(title: text)));
+    await _persistChecklists();
+  }
+
+  Future<void> _editChecklist(_Checklist list) async {
+    final name = await _askChecklistText(title: 'ویرایش نام چک‌لیست', initial: list.title);
+    if (name == null || !mounted) return;
+    setState(() => list.title = name);
+    await _persistChecklists();
+  }
+
+  Future<void> _editChecklistItem(_Checklist list, _ChecklistItem item) async {
+    final title = await _askChecklistText(title: 'ویرایش مورد', initial: item.title);
+    if (title == null || !mounted) return;
+    setState(() => item.title = title);
+    await _persistChecklists();
+  }
+
+  Future<bool> _confirmChecklistDelete(String title) async {
+    return await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('حذف'),
+      content: Text('«$title» حذف شود؟'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('حذف')),
+      ],
+    )) ?? false;
+  }
+
+  Future<void> _deleteChecklist(_Checklist list) async {
+    if (!await _confirmChecklistDelete(list.title) || !mounted) return;
+    setState(() => _checklists.remove(list));
+    await _persistChecklists();
+  }
+
+  Future<void> _deleteChecklistItem(_Checklist list, _ChecklistItem item) async {
+    if (!await _confirmChecklistDelete(item.title) || !mounted) return;
+    setState(() => list.items.remove(item));
+    await _persistChecklists();
+  }
+
+  Widget _buildChecklistsPage() {
+    return ListView(padding: const EdgeInsets.all(16), children: [
+      Row(children: [
+        const Expanded(child: Text('چک‌لیست‌های من', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold))),
+        FilledButton.icon(onPressed: _addChecklist, icon: const Icon(Icons.add), label: const Text('چک‌لیست جدید'),
+          style: FilledButton.styleFrom(backgroundColor: _accentColor)),
+      ]),
+      const SizedBox(height: 10),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        OutlinedButton.icon(onPressed: _exportChecklistsTxt, icon: const Icon(Icons.text_snippet_outlined), label: const Text('خروجی TXT')),
+        OutlinedButton.icon(onPressed: _importChecklistTxt, icon: const Icon(Icons.upload_file), label: const Text('ورود از فایل TXT')),
+        OutlinedButton.icon(onPressed: _backupChecklists, icon: const Icon(Icons.backup_outlined), label: const Text('پشتیبان چک‌لیست‌ها')),
+        OutlinedButton.icon(onPressed: _restoreChecklistsBackup, icon: const Icon(Icons.restore), label: const Text('بازیابی پشتیبان')),
+      ]),
+      const SizedBox(height: 8),
+      const Text('برای هر بخش از کارها یک چک‌لیست جدا بساز و موارد انجام‌شده را علامت بزن.',
+        style: TextStyle(color: Colors.black54, height: 1.6)),
+      const SizedBox(height: 14),
+      if (_checklists.isEmpty)
+        const Padding(padding: EdgeInsets.symmetric(vertical: 36),
+          child: Center(child: Text('هنوز چک‌لیستی نساخته‌ای.')))
+      else
+        ..._checklists.map((list) {
+          final done = list.items.where((e) => e.done).length;
+          final total = list.items.length;
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            color: Colors.white,
+            child: ExpansionTile(
+              key: PageStorageKey<String>(list.id),
+              leading: Icon(Icons.checklist_rounded, color: _accentColor),
+              title: Text(list.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text('انجام‌شده: ${_persianDigits(done.toString())} از ${_persianDigits(total.toString())}'),
+              childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'ذخیره گزارش اکسل این چک‌لیست',
+                    onPressed: () => _exportChecklistExcel(list),
+                    icon: Icon(Icons.file_download_outlined, color: _accentColor),
+                  ),
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'edit') _editChecklist(list);
+                      if (value == 'delete') _deleteChecklist(list);
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'edit', child: Text('ویرایش نام')),
+                      PopupMenuItem(value: 'delete', child: Text('حذف چک‌لیست')),
+                    ],
+                  ),
+                ],
+              ),
+              children: [
+                if (total > 0)
+                  Padding(padding: const EdgeInsets.only(bottom: 8),
+                    child: LinearProgressIndicator(value: total == 0 ? 0 : done / total,
+                      color: _accentColor, backgroundColor: const Color(0xFFE9ECF3))),
+                if (list.items.isEmpty)
+                  const Padding(padding: EdgeInsets.all(12), child: Text('هنوز موردی اضافه نشده است.')),
+                ...list.items.map((item) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Checkbox(value: item.done, activeColor: _accentColor,
+                    onChanged: (value) async {
+                      _toggleChecklistItem(item, value ?? false);
+                      await _persistChecklists();
+                    }),
+                  title: Text(item.title,
+                    style: TextStyle(decoration: item.done ? TextDecoration.lineThrough : null,
+                      color: item.done ? Colors.black45 : null)),
+                  subtitle: item.history.isEmpty ? null : Text(
+                    'آخرین تغییر: ${_jalaliDate(DateTime.parse(item.history.last['at'] as String))} - ${_clockTime(DateTime.parse(item.history.last['at'] as String))}'),
+                  onTap: () async {
+                    _toggleChecklistItem(item, !item.done);
+                    await _persistChecklists();
+                  },
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'edit') _editChecklistItem(list, item);
+                      if (value == 'delete') _deleteChecklistItem(list, item);
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'edit', child: Text('ویرایش')),
+                      PopupMenuItem(value: 'delete', child: Text('حذف')),
+                    ],
+                  ),
+                )),
+                Align(alignment: Alignment.centerRight,
+                  child: TextButton.icon(onPressed: () => _addChecklistItem(list),
+                    icon: const Icon(Icons.add), label: const Text('افزودن مورد'))),
+              ],
+            ),
+          );
+        }),
+    ]);
+  }
+
+  Future<void> _initializeAlarmNotifications() async {
+    final android=_notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    await android?.requestNotificationsPermission();
+    await android?.requestExactAlarmsPermission();
+    const channel=AndroidNotificationChannel('countdown_alarm_channel','هشدار پایان تایمر',
+      description:'هشدار صوتی هنگام پایان تایمر معکوس',importance:Importance.max,playSound:true,enableVibration:true);
+    await android?.createNotificationChannel(channel);
+  }
+  Future<void> _loadCountdownAlarmSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _countdownAlarmEnabled = prefs.getBool('countdown_alarm_enabled') ?? true;
+      _countdownAlarmSound = prefs.getBool('countdown_alarm_sound') ?? true;
+      _countdownAlarmVibration = prefs.getBool('countdown_alarm_vibration') ?? true;
+    });
+  }
+
+  Future<void> _saveCountdownAlarmSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('countdown_alarm_enabled', _countdownAlarmEnabled);
+    await prefs.setBool('countdown_alarm_sound', _countdownAlarmSound);
+    await prefs.setBool('countdown_alarm_vibration', _countdownAlarmVibration);
+    if (!_countdownAlarmEnabled) {
+      for (final item in _countdowns) { await _notifications.cancel(item.id); }
+    } else {
+      for (final item in _countdowns.where((item) => item.running)) {
+        await _scheduleCountdownAlarm(item);
+      }
+    }
+  }
+
+  NotificationDetails get _alarmDetails => NotificationDetails(android:AndroidNotificationDetails(
+    'countdown_alarm_channel','هشدار پایان تایمر',channelDescription:'هشدار هنگام پایان تایمر معکوس',
+    importance:Importance.max,priority:Priority.max,playSound:_countdownAlarmSound,
+    enableVibration:_countdownAlarmVibration,
+    category:AndroidNotificationCategory.alarm,audioAttributesUsage:AudioAttributesUsage.alarm));
+  Future<void> _scheduleCountdownAlarm(_CountdownTimer item) async {
+    if(item.endsAt==null || !_countdownAlarmEnabled)return;
+    await _notifications.zonedSchedule(item.id,'زمان تایمر به پایان رسید',item.title,
+      tz.TZDateTime.from(item.endsAt!,tz.local),_alarmDetails,
+      androidScheduleMode:AndroidScheduleMode.exactAllowWhileIdle,payload:'countdown:'+item.id.toString());
+  }
+  void _tickCountdowns(){
+    var changed=false;
+    for(final item in _countdowns){
+      if(!item.running||item.endsAt==null)continue;
+      final left=item.endsAt!.difference(DateTime.now()).inSeconds;
+      final next=left<=0?0:left;
+      if(next!=item.remainingSeconds){item.remainingSeconds=next;changed=true;}
+      if(next<=0){item.running=false;item.finished=true;item.endsAt=null;_finishCountdown(item);changed=true;}
+    }
+    if(changed&&mounted)setState((){});
+  }
+  Future<void> _finishCountdown(_CountdownTimer item) async {
+    await _notifications.cancel(item.id);
+    if (_countdownAlarmEnabled) {
+      await _notifications.show(item.id,'پایان تایمر','زمان «'+item.title+'» به پایان رسید.',_alarmDetails,payload:'countdown:'+item.id.toString());
+      if (_countdownAlarmSound) SystemSound.play(SystemSoundType.alert);
+    }
+  }
+  void _addCountdown(){
+    final seconds=_wheelHours*3600+_wheelMinutes*60+_wheelSeconds;
+    if(seconds<=0){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('ابتدا یک زمان بیشتر از صفر انتخاب کن.')));return;}
+    setState(()=>_countdowns.add(_CountdownTimer(id:_nextCountdownId++,title:'تایمر '+(_countdowns.length+1).toString(),totalSeconds:seconds)));
+  }
+  Future<void> _startCountdown(_CountdownTimer item) async {
+    if(item.running||item.remainingSeconds<=0)return;
+    setState(() { item.running=true; item.finished=false; item.endsAt=DateTime.now().add(Duration(seconds:item.remainingSeconds)); });
+    await _scheduleCountdownAlarm(item);
+  }
+  Future<void> _pauseCountdown(_CountdownTimer item) async {
+    if(!item.running)return;
+    final remaining=item.endsAt!.difference(DateTime.now()).inSeconds;
+    await _notifications.cancel(item.id);
+    setState(() { item.remainingSeconds=remaining<0?0:remaining; item.running=false; item.endsAt=null; });
+  }
+  Future<void> _stopCountdown(_CountdownTimer item) async {
+    await _notifications.cancel(item.id);
+    setState(() { item.running=false; item.finished=false; item.endsAt=null; item.remainingSeconds=item.totalSeconds; });
+  }
+  String _countdownText(int seconds){
+    final h=seconds~/3600,m=(seconds%3600)~/60,s=seconds%60;
+    return _persianDigits(_twoDigits(h)+':'+_twoDigits(m)+':'+_twoDigits(s));
+  }
+  Widget _wheelPicker(String label, int max, int selected, ValueChanged<int> onChanged) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 154,
+            child: ListWheelScrollView.useDelegate(
+              itemExtent: 42,
+              perspective: 0.003,
+              diameterRatio: 1.5,
+              physics: const FixedExtentScrollPhysics(),
+              onSelectedItemChanged: onChanged,
+              controller: FixedExtentScrollController(initialItem: selected),
+              childDelegate: ListWheelChildBuilderDelegate(
+                childCount: max + 1,
+                builder: (context, index) => Center(
+                  child: Text(
+                    _persianDigits(_twoDigits(index)),
+                    style: TextStyle(
+                      fontSize: index == selected ? 25 : 18,
+                      fontWeight: index == selected ? FontWeight.bold : FontWeight.normal,
+                      color: index == selected ? _accentColor : Colors.black45,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCountdownPage(){
+    final selectedSeconds=_wheelHours*3600+_wheelMinutes*60+_wheelSeconds;
+    return ListView(padding:const EdgeInsets.all(16),children:[
+      const Text('تنظیم تایمر جدید',style:TextStyle(fontSize:19,fontWeight:FontWeight.bold)),
+      const SizedBox(height:8),const Text('ساعت، دقیقه و ثانیه را با حرکت دادن چرخ‌ها انتخاب کن.'),
+      const SizedBox(height:12),
+      Container(padding:const EdgeInsets.all(12),decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(20)),
+        child:Column(children:[
+          Row(children:[
+            _wheelPicker('ساعت',99,_wheelHours,(v)=>setState(()=>_wheelHours=v)),
+            _wheelPicker('دقیقه',59,_wheelMinutes,(v)=>setState(()=>_wheelMinutes=v)),
+            _wheelPicker('ثانیه',59,_wheelSeconds,(v)=>setState(()=>_wheelSeconds=v)),
+          ]),
+          Text(_countdownText(selectedSeconds),style:TextStyle(fontSize:24,fontWeight:FontWeight.bold,color:_accentColor)),
+          const SizedBox(height:12),
+          SizedBox(width:double.infinity,child:FilledButton.icon(onPressed:_addCountdown,icon:const Icon(Icons.add_alarm),
+            label:const Text('افزودن تایمر'),style:FilledButton.styleFrom(backgroundColor:_accentColor))),
+          const SizedBox(height:14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal:12, vertical:6),
+            decoration: BoxDecoration(color:const Color(0xFFF7F8FC),borderRadius:BorderRadius.circular(14)),
+            child: Column(children:[
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('هشدار پس از اتمام تایمر',style:TextStyle(fontWeight:FontWeight.w600)),
+                subtitle: const Text('پس از صفر شدن زمان، اعلان هشدار نمایش داده شود.'),
+                value:_countdownAlarmEnabled, activeColor:_accentColor,
+                onChanged:(v) async { setState(()=>_countdownAlarmEnabled=v); await _saveCountdownAlarmSettings(); },
+              ),
+              if (_countdownAlarmEnabled) ...[
+                const Divider(height:1),
+                SwitchListTile(
+                  contentPadding:EdgeInsets.zero, title:const Text('صدای هشدار'),
+                  secondary:const Icon(Icons.volume_up_outlined),
+                  value:_countdownAlarmSound, activeColor:_accentColor,
+                  onChanged:(v) async { setState(()=>_countdownAlarmSound=v); await _saveCountdownAlarmSettings(); },
+                ),
+                SwitchListTile(
+                  contentPadding:EdgeInsets.zero, title:const Text('لرزش هنگام هشدار'),
+                  secondary:const Icon(Icons.vibration),
+                  value:_countdownAlarmVibration, activeColor:_accentColor,
+                  onChanged:(v) async { setState(()=>_countdownAlarmVibration=v); await _saveCountdownAlarmSettings(); },
+                ),
+              ],
+            ]),
+          ),
+        ])),
+      const SizedBox(height:22),
+      Row(children:[const Expanded(child:Text('تایمرهای من',style:TextStyle(fontSize:19,fontWeight:FontWeight.bold))),
+        Text(_persianDigits(_countdowns.length.toString()),style:TextStyle(color:_accentColor,fontWeight:FontWeight.bold))]),
+      const SizedBox(height:10),
+      if(_countdowns.isEmpty) const Padding(padding:EdgeInsets.all(24),child:Center(child:Text('هنوز تایمری اضافه نشده است.')))
+      else ..._countdowns.map(_buildCountdownCard),
+    ]);
+  }
+  Widget _buildCountdownCard(_CountdownTimer item){
+    final progress=item.totalSeconds==0?0.0:(item.remainingSeconds/item.totalSeconds).clamp(0.0,1.0);
+    return Container(margin:const EdgeInsets.only(bottom:12),padding:const EdgeInsets.all(14),
+      decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(20),border:Border.all(color:const Color(0xFFE8EAF0))),
+      child:Column(children:[
+        Row(children:[Expanded(child:Text(item.title,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:16))),
+          IconButton(tooltip:'حذف تایمر',onPressed:()async{await _notifications.cancel(item.id);if(mounted)setState(()=>_countdowns.remove(item));},
+            icon:const Icon(Icons.delete_outline,color:Colors.redAccent))]),
+        const SizedBox(height:8),
+        SizedBox(width:174,height:174,child:Stack(alignment:Alignment.center,children:[
+          SizedBox.expand(child:CircularProgressIndicator(value:progress,strokeWidth:11,strokeCap:StrokeCap.round,
+            backgroundColor:const Color(0xFFE9ECF3),valueColor:AlwaysStoppedAnimation<Color>(_accentColor))),
+          Column(mainAxisSize:MainAxisSize.min,children:[
+            Text(_countdownText(item.remainingSeconds),textDirection:TextDirection.ltr,
+              style:const TextStyle(fontSize:25,fontWeight:FontWeight.bold,fontFeatures:[FontFeature.tabularFigures()])),
+            const SizedBox(height:4),Text(item.finished?'پایان یافته':item.running?'در حال شمارش':'متوقف',style:const TextStyle(color:Colors.black54,fontSize:12)),
+          ]),
+        ])),
+        const SizedBox(height:12),
+        Row(children:[
+          Expanded(child:FilledButton.icon(onPressed:item.running||item.remainingSeconds==0?null:()=>_startCountdown(item),icon:const Icon(Icons.play_arrow),label:const Text('شروع'))),
+          const SizedBox(width:8),
+          Expanded(child:OutlinedButton.icon(onPressed:item.running?()=>_pauseCountdown(item):null,icon:const Icon(Icons.pause),label:const Text('مکث'))),
+          const SizedBox(width:8),
+          Expanded(child:OutlinedButton.icon(onPressed:()=>_stopCountdown(item),icon:const Icon(Icons.stop),label:const Text('توقف'))),
+        ]),
+      ]));
+  }
+
+  Widget _buildActivitiesPage() {
+    final totalByName = <String, int>{};
+    for (final item in _savedActivities) {
+      totalByName[item.name] = (totalByName[item.name] ?? 0) + item.durationSeconds;
+    }
+    final grouped = <String, List<String>>{};
+    for (final name in _activityNames) {
+      final category = _activityCategories[name] ?? 'بدون پوشه';
+      (grouped[category] ??= []).add(name);
+    }
+    final categories = {...grouped.keys, ..._activityCategoryNames}.toList()..sort();
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Row(
+          children: [
+            const Expanded(child: Text('فهرست فعالیت‌ها', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold))),
+            FilledButton.icon(
+              onPressed: _addActivityToCatalog,
+              icon: const Icon(Icons.add, size: 19),
+              label: const Text('فعالیت جدید'),
+              style: FilledButton.styleFrom(backgroundColor: _accentColor),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Align(alignment: Alignment.centerLeft, child: OutlinedButton.icon(
+          onPressed: _manageActivityCategories, icon: const Icon(Icons.folder_outlined), label: const Text('مدیریت پوشه‌ها'))),
+        const Text(
+          'برای مشاهده سوابق، روی فعالیت بزن. فعالیت‌ها را می‌توانی در پوشه‌های مختلف مرتب کنی.',
+          style: TextStyle(color: Colors.black54, height: 1.6),
+        ),
+        const SizedBox(height: 14),
+        if (_activityNames.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 30),
+            child: Center(child: Text('هنوز فعالیتی اضافه نکرده‌ای.')),
+          )
+        else
+          ...categories.map((category) {
+            final namesInCategory = grouped[category] ?? const <String>[];
+            return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 8),
+                child: Row(children: [
+                  Icon(Icons.folder_outlined, size: 19, color: _accentColor),
+                  const SizedBox(width: 7),
+                  Text(category, style: TextStyle(fontWeight: FontWeight.bold, color: _accentColor)),
+                  const SizedBox(width: 8),
+                  Text(_persianDigits(namesInCategory.length.toString()),
+                    style: const TextStyle(color: Colors.black45, fontSize: 12)),
+                ]),
+              ),
+              ...namesInCategory.map((name) => Card(
+                margin: const EdgeInsets.only(bottom: 9),
+                color: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: Color(0xFFE8EAF0)),
+                ),
+                child: ListTile(
+                  onTap: () => _openActivityDetails(name),
+                  leading: Icon(Icons.label_outline_rounded, color: _accentColor),
+                  title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text('مشاهده تمام دفعات ثبت‌شده'),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(_durationText(Duration(seconds: totalByName[name] ?? 0)),
+                      textDirection: TextDirection.ltr,
+                      style: TextStyle(color: _accentColor, fontWeight: FontWeight.bold)),
+                    PopupMenuButton<String>(
+                      tooltip: 'مدیریت فعالیت',
+                      onSelected: (value) {
+                        if (value == '__edit_activity__') {
+                          _editActivityName(name);
+                        } else if (value == '__delete_activity__') {
+                          _deleteActivity(name);
+                        } else if (value == '__new__') {
+                          _setActivityCategory(name);
+                        } else {
+                          setState(() => _activityCategories[name] = value);
+                          _persistActivityCategories();
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(value: '__edit_activity__', child: Text('ویرایش نام فعالیت')),
+                        const PopupMenuItem(value: '__delete_activity__', child: Text('حذف فعالیت', style: TextStyle(color: Colors.red))),
+                        const PopupMenuDivider(),
+                        const PopupMenuItem(value: '__new__', child: Text('انتقال به پوشه')),
+                        const PopupMenuDivider(),
+                        ...categories.where((c) => c != category).map((c) =>
+                          PopupMenuItem(value: c, child: Text(c))),
+                        const PopupMenuItem(value: 'بدون پوشه', child: Text('بدون پوشه')),
+                      ],
+                    ),
+                  ]),
+                ),
+              )),
+            ],
+          );
+          }),
+      ],
+    );
+  }
+
+  Widget _detailLine(String label, String value) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 48,
+          child: Text(label, style: const TextStyle(color: Colors.black54)),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.start,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPlaceholder(IconData icon, String title, String description) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 54, color: _accentColor),
+            const SizedBox(height: 18),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              description,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.black54,
+                height: 1.8,
+                fontSize: 15,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+, caseSensitive: false), '');
+      final title = await _askChecklistText(
+        title: 'نام چک‌لیست واردشده',
+        hint: 'نام چک‌لیست',
+        initial: fileName,
+      );
+      if (title == null || !mounted) return;
+
+      setState(() {
+        _checklists.insert(0, _Checklist(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          title: title,
+          items: items.map((line) => _ChecklistItem(title: line)).toList(),
+        ));
+      });
+      await _persistChecklists();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${items.length} مورد از فایل متنی وارد چک‌لیست «$title» شد.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خواندن فایل متنی ناموفق بود: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _addChecklist() async {
     final name = await _askChecklistText(title: 'چک‌لیست جدید', hint: 'مثلاً برنامه روزانه');
     if (name == null || !mounted) return;
