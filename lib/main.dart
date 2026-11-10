@@ -1096,18 +1096,18 @@ class _MainScreenState extends State<MainScreen> {
     }
     final buffer = StringBuffer('گزارش چک‌لیست‌ها\n====================\n');
     for (final list in _checklists) {
-      buffer.writeln('\n\${list.title}');
+      buffer.writeln('\n${list.title}');
       buffer.writeln('------------------------------');
       for (final item in list.items) {
-        buffer.writeln('[\${item.done ? '✓ انجام‌شده' : '✗ انجام‌نشده'}] \${item.title}');
+        buffer.writeln('[${item.done ? '✓ انجام‌شده' : '✗ انجام‌نشده'}] ${item.title}');
         for (final event in item.history) {
           final at = DateTime.tryParse(event['at']?.toString() ?? '');
-          if (at != null) buffer.writeln('  \${event['done'] == true ? 'انجام شد' : 'انجام‌نشده شد'}: \${_jalaliDate(at)} \${_clockTime(at)}');
+          if (at != null) buffer.writeln('  ${event['done'] == true ? 'انجام شد' : 'انجام‌نشده شد'}: ${_jalaliDate(at)} ${_clockTime(at)}');
         }
       }
     }
     final dir = await getTemporaryDirectory();
-    final file = File('\${dir.path}/checklists_\${DateTime.now().millisecondsSinceEpoch}.txt');
+    final file = File('${dir.path}/checklists_${DateTime.now().millisecondsSinceEpoch}.txt');
     await file.writeAsString(buffer.toString(), encoding: utf8, flush: true);
     await Share.shareXFiles([XFile(file.path)], text: 'خروجی چک‌لیست‌ها');
   }
