@@ -262,6 +262,10 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   Color _accentColor = _colors.first;
   DateTime _now = DateTime.now();
+  static const _clockOffsetStorageKey = 'program_clock_offset_minutes_v1';
+  int _clockOffsetMinutes = 0;
+
+  DateTime get _programNow => DateTime.now().add(Duration(minutes: _clockOffsetMinutes));
   DateTime? _reportStartDate;
   DateTime? _reportEndDate;
   final Set<String> _reportSelectedNames = {};
@@ -283,8 +287,9 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _now = DateTime.now());
+      if (mounted) setState(() => _now = _programNow);
     });
+    _loadProgramClockSettings();
     _initializeData();
     _loadChecklists();
     _loadCountdownAlarmSettings();
@@ -545,7 +550,7 @@ class _MainScreenState extends State<MainScreen> {
     final activity = _RunningActivity(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: name.trim(),
-      startedAt: DateTime.now(),
+      startedAt: _programNow,
     );
     setState(() => _runningActivities.insert(0, activity));
   }
@@ -554,7 +559,7 @@ class _MainScreenState extends State<MainScreen> {
     final activity = _RunningActivity(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: '',
-      startedAt: DateTime.now(),
+      startedAt: _programNow,
     );
     setState(() => _runningActivities.insert(0, activity));
   }
@@ -637,7 +642,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _stopActivity(_RunningActivity activity) async {
     activity.stopwatch.stop();
-    final endedAt = DateTime.now();
+    final endedAt = _programNow;
     final saved = _SavedActivity(
       name: activity.name.trim().isEmpty ? 'فعالیت بدون نام' : activity.name.trim(),
       startDate: _jalaliDate(activity.startedAt),
@@ -657,6 +662,54 @@ class _MainScreenState extends State<MainScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('فعالیت «${activity.name}» ذخیره شد')),
     );
+  }
+
+  Future<void> _loadProgramClockSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final offset = prefs.getInt(_clockOffsetStorageKey) ?? 0;
+    if (!mounted) return;
+    setState(() {
+      _clockOffsetMinutes = offset;
+      _now = _programNow;
+    });
+  }
+
+  Future<void> _showProgramClockSettings() async {
+    final current = _programNow;
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: current.hour, minute: current.minute),
+      helpText: 'ساعت موردنظر برای برنامه را انتخاب کن',
+      confirmText: 'ثبت ساعت',
+      cancelText: 'انصراف',
+    );
+    if (selected == null || !mounted) return;
+    final realNow = DateTime.now();
+    final selectedMinutes = selected.hour * 60 + selected.minute;
+    final realMinutes = realNow.hour * 60 + realNow.minute;
+    var offset = selectedMinutes - realMinutes;
+    if (offset > 720) offset -= 1440;
+    if (offset < -720) offset += 1440;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_clockOffsetStorageKey, offset);
+    if (!mounted) return;
+    setState(() {
+      _clockOffsetMinutes = offset;
+      _now = _programNow;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('ساعت برنامه روی ${_clockTime(_now, withSeconds: false)} تنظیم شد.')),
+    );
+  }
+
+  Future<void> _resetProgramClock() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_clockOffsetStorageKey);
+    if (!mounted) return;
+    setState(() {
+      _clockOffsetMinutes = 0;
+      _now = DateTime.now();
+    });
   }
 
   Future<void> _showColorSettings() async {
@@ -717,12 +770,23 @@ class _MainScreenState extends State<MainScreen> {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
-          if (_selectedIndex == 0)
+          if (_selectedIndex == 0) ...[
+            IconButton(
+              tooltip: 'تنظیم ساعت برنامه',
+              onPressed: _showProgramClockSettings,
+              icon: const Icon(Icons.schedule_outlined),
+            ),
+            IconButton(
+              tooltip: 'بازگشت به ساعت واقعی',
+              onPressed: _clockOffsetMinutes == 0 ? null : _resetProgramClock,
+              icon: const Icon(Icons.restore),
+            ),
             IconButton(
               tooltip: 'تنظیم رنگ‌ها',
               onPressed: _showColorSettings,
               icon: const Icon(Icons.palette_outlined),
             ),
+          ],
         ],
       ),
       body: IndexedStack(
