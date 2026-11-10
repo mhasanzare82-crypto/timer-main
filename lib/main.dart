@@ -92,16 +92,23 @@ class _SavedActivity {
 
 class _RunningActivity {
   final String id;
-  final String name;
+  String name;
   final DateTime startedAt;
   final Stopwatch stopwatch = Stopwatch();
+  final TextEditingController nameController = TextEditingController();
 
   _RunningActivity({
     required this.id,
     required this.name,
     required this.startedAt,
   }) {
+    nameController.text = name;
     stopwatch.start();
+  }
+
+  void dispose() {
+    stopwatch.stop();
+    nameController.dispose();
   }
 }
 
@@ -193,7 +200,7 @@ class _MainScreenState extends State<MainScreen> {
     _clock?.cancel();
     _countdownTicker?.cancel();
     for (final activity in _runningActivities) {
-      activity.stopwatch.stop();
+      activity.dispose();
     }
     super.dispose();
   }
@@ -280,16 +287,45 @@ class _MainScreenState extends State<MainScreen> {
 
   void _startNewActivity(String name) {
     if (name.trim().isEmpty) return;
-    setState(() {
-      _runningActivities.insert(
-        0,
-        _RunningActivity(
-          id: DateTime.now().microsecondsSinceEpoch.toString(),
-          name: name.trim(),
-          startedAt: DateTime.now(),
-        ),
+    final activity = _RunningActivity(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      name: name.trim(),
+      startedAt: DateTime.now(),
+    );
+    setState(() => _runningActivities.insert(0, activity));
+  }
+
+  void _createActivityTimer() {
+    final activity = _RunningActivity(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      name: '',
+      startedAt: DateTime.now(),
+    );
+    setState(() => _runningActivities.insert(0, activity));
+  }
+
+  Future<void> _saveActivityName(_RunningActivity activity) async {
+    final name = activity.nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ابتدا نام فعالیت را وارد کن.')),
       );
-    });
+      return;
+    }
+    activity.name = name;
+    if (!_activityNames.any((item) => item.toLowerCase() == name.toLowerCase())) {
+      setState(() {
+        _activityNames.add(name);
+        _activityNames.sort();
+      });
+      await _persistActivityNames();
+    } else if (mounted) {
+      setState(() {});
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('نام «$name» ذخیره شد؛ تایمر همچنان فعال است.')),
+    );
   }
 
   Future<void> _persistActivities() async {
@@ -348,7 +384,7 @@ class _MainScreenState extends State<MainScreen> {
     activity.stopwatch.stop();
     final endedAt = DateTime.now();
     final saved = _SavedActivity(
-      name: activity.name,
+      name: activity.name.trim().isEmpty ? 'فعالیت بدون نام' : activity.name.trim(),
       startDate: _jalaliDate(activity.startedAt),
       startTime: _clockTime(activity.startedAt),
       endDate: _jalaliDate(endedAt),
@@ -360,6 +396,7 @@ class _MainScreenState extends State<MainScreen> {
       _runningActivities.removeWhere((item) => item.id == activity.id);
       _savedActivities.insert(0, saved);
     });
+    activity.dispose();
     await _persistActivities();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -482,7 +519,7 @@ class _MainScreenState extends State<MainScreen> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 18),
+          padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
           decoration: BoxDecoration(
             color: _accentColor,
             borderRadius: BorderRadius.circular(24),
@@ -498,11 +535,7 @@ class _MainScreenState extends State<MainScreen> {
             children: [
               Text(
                 _persianDigits(_jalaliDate(_now)),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 10),
               Text(
@@ -517,103 +550,29 @@ class _MainScreenState extends State<MainScreen> {
                 ),
               ),
               const SizedBox(height: 5),
-              const Text(
-                'ساعت فعلی',
-                style: TextStyle(color: Colors.white70, fontSize: 13),
+              const Text('ساعت فعلی', style: TextStyle(color: Colors.white70, fontSize: 13)),
+              const SizedBox(height: 18),
+              if (_runningActivities.isNotEmpty) ...[
+                const Divider(color: Colors.white30, height: 1),
+                const SizedBox(height: 14),
+                ..._runningActivities.map(_buildRunningActivityCard),
+                const SizedBox(height: 4),
+              ],
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _createActivityTimer,
+                  icon: const Icon(Icons.add_circle_outline_rounded),
+                  label: const Text('فعالیت جدید'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: _accentColor,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                  ),
+                ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 22),
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'فعالیت‌های در حال ثبت',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-            Text(
-              _persianDigits(_runningActivities.length.toString()),
-              style: TextStyle(
-                color: _accentColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (_runningActivities.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFE8EAF0)),
-            ),
-            child: const Column(
-              children: [
-                Icon(Icons.timer_outlined, size: 34, color: Colors.black38),
-                SizedBox(height: 8),
-                Text(
-                  'هنوز فعالیتی شروع نشده است',
-                  style: TextStyle(color: Colors.black54),
-                ),
-              ],
-            ),
-          )
-        else
-          ..._runningActivities.map(_buildRunningActivityCard),
-        const SizedBox(height: 18),
-        Autocomplete<String>(
-          optionsBuilder: (value) {
-            final query = value.text.trim().toLowerCase();
-            if (query.isEmpty) return const Iterable<String>.empty();
-            return _activityNames.where((name) => name.toLowerCase().startsWith(query));
-          },
-          onSelected: _startNewActivity,
-          fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) => TextField(
-            controller: controller,
-            focusNode: focusNode,
-            textInputAction: TextInputAction.done,
-            decoration: InputDecoration(
-              hintText: 'برای انتخاب، نام فعالیت را تایپ کن...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: IconButton(
-                tooltip: 'پاک کردن',
-                onPressed: controller.clear,
-                icon: const Icon(Icons.close),
-              ),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-            onSubmitted: (_) => onFieldSubmitted(),
-          ),
-          optionsViewBuilder: (context, onSelected, options) => Align(
-            alignment: Alignment.topRight,
-            child: Material(
-              elevation: 5,
-              borderRadius: BorderRadius.circular(12),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 220, maxWidth: 340),
-                child: ListView(
-                  padding: EdgeInsets.zero,
-                  shrinkWrap: true,
-                  children: options.map((name) => ListTile(
-                    leading: const Icon(Icons.play_circle_outline),
-                    title: Text(name),
-                    onTap: () => onSelected(name),
-                  )).toList(),
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'با تایپ حرف اول یا چند حرف، فعالیت را پیدا و انتخاب کن.',
-          style: TextStyle(color: Colors.black54, fontSize: 12),
         ),
       ],
     );
@@ -623,10 +582,10 @@ class _MainScreenState extends State<MainScreen> {
     final isRunning = activity.stopwatch.isRunning;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        color: const Color(0xFFF7F8FC),
+        borderRadius: BorderRadius.circular(17),
         border: Border.all(color: const Color(0xFFE8EAF0)),
       ),
       child: Column(
@@ -636,39 +595,58 @@ class _MainScreenState extends State<MainScreen> {
             children: [
               Expanded(
                 child: Text(
-                  activity.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: _accentColor.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
                   _durationText(activity.stopwatch.elapsed),
                   textDirection: TextDirection.ltr,
                   style: TextStyle(
                     color: _accentColor,
                     fontWeight: FontWeight.bold,
-                    fontSize: 17,
+                    fontSize: 22,
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ),
+              Text(
+                isRunning ? 'در حال اجرا' : 'مکث شده',
+                style: TextStyle(
+                  color: isRunning ? Colors.green.shade700 : Colors.black54,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: activity.nameController,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
+                    hintText: 'نام فعالیت',
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  onChanged: (value) => activity.name = value,
+                  onSubmitted: (_) => _saveActivityName(activity),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton.filled(
+                tooltip: 'ذخیره نام فعالیت',
+                onPressed: () => _saveActivityName(activity),
+                icon: const Icon(Icons.save_outlined),
+                style: IconButton.styleFrom(backgroundColor: _accentColor, foregroundColor: Colors.white),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
@@ -676,25 +654,19 @@ class _MainScreenState extends State<MainScreen> {
                   onPressed: isRunning ? null : () => _startActivity(activity),
                   icon: const Icon(Icons.play_arrow_rounded, size: 19),
                   label: const Text('شروع'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _accentColor,
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                  ),
+                  style: OutlinedButton.styleFrom(foregroundColor: _accentColor, padding: const EdgeInsets.symmetric(vertical: 9)),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 7),
               Expanded(
                 child: FilledButton.tonalIcon(
                   onPressed: isRunning ? () => _pauseActivity(activity) : null,
                   icon: const Icon(Icons.pause_rounded, size: 18),
                   label: const Text('مکث'),
-                  style: FilledButton.styleFrom(
-                    foregroundColor: _accentColor,
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                  ),
+                  style: FilledButton.styleFrom(foregroundColor: _accentColor, padding: const EdgeInsets.symmetric(vertical: 9)),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 7),
               Expanded(
                 child: FilledButton.icon(
                   onPressed: () => _stopActivity(activity),
@@ -713,7 +685,6 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
   }
-
 
   DateTime? _reportDate(_SavedActivity item) {
     try {
