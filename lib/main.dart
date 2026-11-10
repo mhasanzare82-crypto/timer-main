@@ -1524,16 +1524,19 @@ class _MainScreenState extends State<MainScreen> {
       TextCellValue('نام چک‌لیست'),
       TextCellValue('مورد'),
       TextCellValue('وضعیت'),
-      TextCellValue('تاریخ ثبت وضعیت'),
-      TextCellValue('ساعت ثبت وضعیت'),
+      TextCellValue('تاریخ آخرین تغییر / تهیه گزارش'),
+      TextCellValue('ساعت آخرین تغییر / تهیه گزارش'),
     ]);
     for (final item in list.items) {
+      final lastChange = item.history.isEmpty
+          ? exportedAt
+          : (DateTime.tryParse(item.history.last['at']?.toString() ?? '') ?? exportedAt);
       current.appendRow([
         TextCellValue(list.title),
         TextCellValue(item.title),
         TextCellValue(item.done ? 'انجام‌شده' : 'انجام‌نشده'),
-        TextCellValue(_jalaliDate(exportedAt)),
-        TextCellValue(_clockTime(exportedAt)),
+        TextCellValue(_jalaliDate(lastChange)),
+        TextCellValue(_clockTime(lastChange)),
       ]);
     }
 
