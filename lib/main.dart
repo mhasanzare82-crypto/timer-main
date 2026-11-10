@@ -1741,6 +1741,7 @@ class _MainScreenState extends State<MainScreen> {
       const SizedBox(height: 10),
       Wrap(spacing: 8, runSpacing: 8, children: [
         OutlinedButton.icon(onPressed: _exportChecklistsTxt, icon: const Icon(Icons.text_snippet_outlined), label: const Text('خروجی TXT')),
+        OutlinedButton.icon(onPressed: _createChecklistFromMultilineText, icon: const Icon(Icons.edit_note), label: const Text('ورود سریع با متن')),
         OutlinedButton.icon(onPressed: _importChecklistTxt, icon: const Icon(Icons.upload_file), label: const Text('ورود از فایل TXT')),
         OutlinedButton.icon(onPressed: _backupChecklists, icon: const Icon(Icons.backup_outlined), label: const Text('پشتیبان چک‌لیست‌ها')),
         OutlinedButton.icon(onPressed: _restoreChecklistsBackup, icon: const Icon(Icons.restore), label: const Text('بازیابی پشتیبان')),
@@ -2215,6 +2216,67 @@ class _MainScreenState extends State<MainScreen> {
           SnackBar(content: Text('خواندن فایل متنی ناموفق بود: $e')),
         );
       }
+    }
+  }
+
+  Future<void> _createChecklistFromMultilineText() async {
+    final controller = TextEditingController();
+    final text = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ساخت چک‌لیست از متن'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: TextField(
+            controller: controller,
+            autofocus: true,
+            minLines: 8,
+            maxLines: 14,
+            textDirection: TextDirection.rtl,
+            decoration: const InputDecoration(
+              hintText: 'هر خط را در یک مورد جداگانه بنویسید...',
+              border: OutlineInputBorder(),
+              alignLabelWithHint: true,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, controller.text), child: const Text('ادامه')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (text == null || !mounted) return;
+
+    final items = text
+        .split(RegExp(r'\r?\n'))
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
+    if (items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لطفاً حداقل یک مورد وارد کنید.')),
+      );
+      return;
+    }
+
+    final name = await _askChecklistText(
+      title: 'نام چک‌لیست',
+      hint: 'مثلاً برنامه روزانه',
+      initial: 'چک‌لیست جدید',
+    );
+    if (name == null || !mounted) return;
+    setState(() => _checklists.insert(0, _Checklist(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      title: name,
+      items: items.map((line) => _ChecklistItem(title: line)).toList(),
+    )));
+    await _persistChecklists();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${items.length} مورد به چک‌لیست «$name» اضافه شد.')),
+      );
     }
   }
 
