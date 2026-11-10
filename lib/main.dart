@@ -1091,19 +1091,42 @@ class _MainScreenState extends State<MainScreen> {
     final h=seconds~/3600,m=(seconds%3600)~/60,s=seconds%60;
     return _persianDigits(_twoDigits(h)+':'+_twoDigits(m)+':'+_twoDigits(s));
   }
-  Widget _wheelPicker(String label,int max,int selected,ValueChanged<int> onChanged){
-    return Expanded(child:Column(mainAxisSize:MainAxisSize.min,children:[
-      Text(label,style:const TextStyle(color:Colors.black54,fontWeight:FontWeight.w600)),
-      const SizedBox(height:6),
-      SizedBox(height:154,child:ListWheelScrollView.useDelegate(
-        itemExtent:42,perspective:0.003,diameterRatio:1.5,physics:const FixedExtentScrollPhysics(),
-        onSelectedItemChanged:onChanged,controller:FixedExtentScrollController(initialItem:selected),
-        childDelegate:ListWheelChildBuilderDelegate(childCount:max+1,builder:(context,index)=>Center(child:Text(
-          _persianDigits(_twoDigits(index)),style:TextStyle(fontSize:index==selected?25:18,
-          fontWeight:index==selected?FontWeight.bold:FontWeight.normal,color:index==selected?_accentColor:Colors.black45))))),
-      )),
-    ]));
+  Widget _wheelPicker(String label, int max, int selected, ValueChanged<int> onChanged) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 154,
+            child: ListWheelScrollView.useDelegate(
+              itemExtent: 42,
+              perspective: 0.003,
+              diameterRatio: 1.5,
+              physics: const FixedExtentScrollPhysics(),
+              onSelectedItemChanged: onChanged,
+              controller: FixedExtentScrollController(initialItem: selected),
+              childDelegate: ListWheelChildBuilderDelegate(
+                childCount: max + 1,
+                builder: (context, index) => Center(
+                  child: Text(
+                    _persianDigits(_twoDigits(index)),
+                    style: TextStyle(
+                      fontSize: index == selected ? 25 : 18,
+                      fontWeight: index == selected ? FontWeight.bold : FontWeight.normal,
+                      color: index == selected ? _accentColor : Colors.black45,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
+
   Widget _buildCountdownPage(){
     final selectedSeconds=_wheelHours*3600+_wheelMinutes*60+_wheelSeconds;
     return ListView(padding:const EdgeInsets.all(16),children:[
