@@ -340,15 +340,24 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _loadActivityCategories() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_categoriesStorageKey);
-    if (raw == null) return;
-    try {
-      final decoded = Map<String, dynamic>.from(jsonDecode(raw) as Map);
-      if (!mounted) return;
-      setState(() {
-        _activityCategories = decoded.map((k, v) => MapEntry(k, v.toString()));
-        _activityCategoryNames = <String>{...(_activityCategories.values.where((v) => v != 'بدون دسته‌بندی')), ...(prefs.getStringList('activity_category_names_v1') ?? [])}.toList()..sort();
-      });
-    } catch (_) {}
+    Map<String, String> loadedCategories = {};
+    if (raw != null) {
+      try {
+        final decoded = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+        loadedCategories = decoded.map((k, v) => MapEntry(k, v.toString()));
+      } catch (_) {
+        // Keep the category-name list even if the category mapping is damaged.
+      }
+    }
+    final storedNames = prefs.getStringList('activity_category_names_v1') ?? [];
+    if (!mounted) return;
+    setState(() {
+      _activityCategories = loadedCategories;
+      _activityCategoryNames = <String>{
+        ...loadedCategories.values.where((v) => v != 'بدون دسته‌بندی'),
+        ...storedNames,
+      }.toList()..sort();
+    });
   }
 
   Future<void> _persistActivityCategories() async {
@@ -1184,6 +1193,8 @@ class _MainScreenState extends State<MainScreen> {
       'version': 1,
       'activityNames': _activityNames,
       'savedActivities': _savedActivities.map((a) => a.toJson()).toList(),
+      'activityCategories': _activityCategories,
+      'activityCategoryNames': _activityCategoryNames,
       'checklists': _checklists.map((a) => a.toJson()).toList(),
     });
     final path = await FilePicker.platform.saveFile(
@@ -1204,6 +1215,11 @@ class _MainScreenState extends State<MainScreen> {
       if (data['format'] != 'timer_main_backup' || data['version'] != 1) throw const FormatException('فایل پشتیبان معتبر نیست.');
       final names = (data['activityNames'] as List<dynamic>).cast<String>().toSet().toList();
       final saved = (data['savedActivities'] as List<dynamic>).map((e) => _SavedActivity.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+      final restoredCategories = Map<String, String>.from(
+        (data['activityCategories'] as Map?)?.map((key, value) => MapEntry(key.toString(), value.toString())) ?? {},
+      );
+      final restoredCategoryNames = (data['activityCategoryNames'] as List<dynamic>? ?? [])
+          .map((e) => e.toString()).toSet().toList()..sort();
       final restoredChecklists = (data['checklists'] as List<dynamic>? ?? []).map((e) => _Checklist.fromJson(Map<String, dynamic>.from(e as Map))).toList();
       final yes = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
         title: const Text('بازیابی اطلاعات'),
@@ -1211,10 +1227,22 @@ class _MainScreenState extends State<MainScreen> {
         actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('بازیابی'))],
       ));
       if (yes != true || !mounted) return;
-      setState(() { _activityNames = names..sort(); _savedActivities = saved; _checklists = restoredChecklists; _runningActivities.clear(); });
+      for (final activity in _runningActivities) {
+        activity.dispose();
+      }
+      setState(() {
+        _activityNames = names..sort();
+        _savedActivities = saved;
+        _activityCategories = restoredCategories;
+        _activityCategoryNames = restoredCategoryNames;
+        _checklists = restoredChecklists;
+        _runningActivities.clear();
+      });
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList(_namesStorageKey, _activityNames);
       await prefs.setString(_storageKey, jsonEncode(_savedActivities.map((a) => a.toJson()).toList()));
+      await prefs.setString(_categoriesStorageKey, jsonEncode(_activityCategories));
+      await prefs.setStringList('activity_category_names_v1', _activityCategoryNames);
       await prefs.setString(_checklistsStorageKey, jsonEncode(_checklists.map((a) => a.toJson()).toList()));
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('بازیابی انجام شد.')));
     } catch (e) {
@@ -1718,7 +1746,9 @@ class _MainScreenState extends State<MainScreen> {
             child: Center(child: Text('هنوز فعالیتی اضافه نکرده‌ای.')),
           )
         else
-          ...categories.map((category) => Column(
+          ...categories.map((category) {
+            final namesInCategory = grouped[category] ?? const <String>[];
+            return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
@@ -1728,11 +1758,11 @@ class _MainScreenState extends State<MainScreen> {
                   const SizedBox(width: 7),
                   Text(category, style: TextStyle(fontWeight: FontWeight.bold, color: _accentColor)),
                   const SizedBox(width: 8),
-                  Text(_persianDigits(grouped[category]!.length.toString()),
+                  Text(_persianDigits(namesInCategory.length.toString()),
                     style: const TextStyle(color: Colors.black45, fontSize: 12)),
                 ]),
               ),
-              ...grouped[category]!.map((name) => Card(
+              ...namesInCategory.map((name) => Card(
                 margin: const EdgeInsets.only(bottom: 9),
                 color: Colors.white,
                 elevation: 0,
@@ -1778,7 +1808,8 @@ class _MainScreenState extends State<MainScreen> {
                 ),
               )),
             ],
-          )),
+          );
+          }),
       ],
     );
   }
