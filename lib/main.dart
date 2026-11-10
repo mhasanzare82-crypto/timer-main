@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
@@ -48,7 +49,156 @@ class TimerApp extends StatelessWidget {
         textDirection: TextDirection.rtl,
         child: child!,
       ),
-      home: const MainScreen(),
+      home: const _BiometricGate(child: MainScreen()),
+    );
+  }
+}
+
+
+class _BiometricGate extends StatefulWidget {
+  final Widget child;
+  const _BiometricGate({required this.child});
+
+  @override
+  State<_BiometricGate> createState() => _BiometricGateState();
+}
+
+class _BiometricGateState extends State<_BiometricGate>
+    with WidgetsBindingObserver {
+  final LocalAuthentication _auth = LocalAuthentication();
+  bool _unlocked = false;
+  bool _busy = false;
+  bool _needsAuthentication = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _authenticate());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      if (_unlocked && mounted) {
+        setState(() {
+          _unlocked = false;
+          _needsAuthentication = true;
+        });
+      }
+    } else if (state == AppLifecycleState.resumed &&
+        _needsAuthentication && !_busy) {
+      _authenticate();
+    }
+  }
+
+  Future<void> _authenticate() async {
+    if (_busy || !mounted) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final supported = await _auth.isDeviceSupported();
+      final canCheck = await _auth.canCheckBiometrics;
+      if (!supported || !canCheck) {
+        if (mounted) {
+          setState(() {
+            _error = 'قفل بیومتریک روی این دستگاه در دسترس نیست. اثر انگشت را در تنظیمات گوشی فعال کن.';
+            _busy = false;
+          });
+        }
+        return;
+      }
+
+      final available = await _auth.getAvailableBiometrics();
+      if (available.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _error = 'هیچ اثر انگشتی روی گوشی ثبت نشده است. ابتدا از تنظیمات گوشی اثر انگشت ثبت کن.';
+            _busy = false;
+          });
+        }
+        return;
+      }
+
+      final authenticated = await _auth.authenticate(
+        localizedReason: 'برای ورود به برنامه زمان‌شمار اثر انگشت خود را تأیید کن',
+        biometricOnly: true,
+        persistAcrossBackgrounding: true,
+      );
+      if (!mounted) return;
+      setState(() {
+        _unlocked = authenticated;
+        _needsAuthentication = !authenticated;
+        _busy = false;
+        if (!authenticated) _error = 'تأیید انجام نشد. دوباره تلاش کن.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _unlocked = false;
+        _needsAuthentication = true;
+        _error = 'احراز هویت انجام نشد. تنظیمات اثر انگشت گوشی را بررسی کن.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_unlocked) return widget.child;
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F8FC),
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.fingerprint, size: 88, color: Color(0xFF356AE6)),
+                const SizedBox(height: 18),
+                const Text(
+                  'برنامه قفل است',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'برای ورود، اثر انگشت خود را تأیید کن.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.black54),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 14),
+                  Text(_error!, textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.redAccent)),
+                ],
+                const SizedBox(height: 22),
+                FilledButton.icon(
+                  onPressed: _busy ? null : _authenticate,
+                  icon: _busy
+                      ? const SizedBox(
+                          width: 18, height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.lock_open),
+                  label: Text(_busy ? 'در حال بررسی...' : 'تلاش دوباره'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
