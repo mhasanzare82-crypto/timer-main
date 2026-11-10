@@ -240,14 +240,14 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  void _toggleActivity(_RunningActivity activity) {
-    setState(() {
-      if (activity.stopwatch.isRunning) {
-        activity.stopwatch.stop();
-      } else {
-        activity.stopwatch.start();
-      }
-    });
+  void _startActivity(_RunningActivity activity) {
+    if (activity.stopwatch.isRunning) return;
+    setState(() => activity.stopwatch.start());
+  }
+
+  void _pauseActivity(_RunningActivity activity) {
+    if (!activity.stopwatch.isRunning) return;
+    setState(() => activity.stopwatch.stop());
   }
 
   Future<void> _stopActivity(_RunningActivity activity) async {
@@ -548,12 +548,9 @@ class _MainScreenState extends State<MainScreen> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _toggleActivity(activity),
-                  icon: Icon(
-                    isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                    size: 19,
-                  ),
-                  label: Text(isRunning ? 'مکث' : 'ادامه'),
+                  onPressed: isRunning ? null : () => _startActivity(activity),
+                  icon: const Icon(Icons.play_arrow_rounded, size: 19),
+                  label: const Text('شروع'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _accentColor,
                     padding: const EdgeInsets.symmetric(vertical: 9),
@@ -563,12 +560,9 @@ class _MainScreenState extends State<MainScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: FilledButton.tonalIcon(
-                  onPressed: () => _toggleActivity(activity),
-                  icon: Icon(
-                    isRunning ? Icons.pause_circle_outline : Icons.play_circle,
-                    size: 18,
-                  ),
-                  label: Text(isRunning ? 'توقف موقت' : 'شروع'),
+                  onPressed: isRunning ? () => _pauseActivity(activity) : null,
+                  icon: const Icon(Icons.pause_rounded, size: 18),
+                  label: const Text('مکث'),
                   style: FilledButton.styleFrom(
                     foregroundColor: _accentColor,
                     padding: const EdgeInsets.symmetric(vertical: 9),
