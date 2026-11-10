@@ -524,7 +524,6 @@ class _MainScreenState extends State<MainScreen> {
     _loadProgramClockSettings();
     _initializeData();
     _loadChecklists();
-    _loadCountdownAlarmSettings();
     _initializeAlarmNotifications();
     _countdownTicker=Timer.periodic(const Duration(seconds:1), (_) => _tickCountdowns());
   }
@@ -1716,6 +1715,7 @@ class _MainScreenState extends State<MainScreen> {
       await prefs.setString(_categoriesStorageKey, jsonEncode(_activityCategories));
       await prefs.setStringList('activity_category_names_v1', _activityCategoryNames);
       await prefs.setString(_checklistsStorageKey, jsonEncode(_checklists.map((a) => a.toJson()).toList()));
+      await prefs.setString(_runningActivitiesStorageKey, jsonEncode(<dynamic>[]));
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('بازیابی انجام شد.')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در بازیابی: ' + e.toString())));
@@ -2143,6 +2143,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _initializeAlarmNotifications() async {
+    await _loadCountdownAlarmSettings();
     final android = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await android?.requestNotificationsPermission();
     await android?.requestExactAlarmsPermission();
