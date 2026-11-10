@@ -346,7 +346,7 @@ class _MainScreenState extends State<MainScreen> {
       if (!mounted) return;
       setState(() {
         _activityCategories = decoded.map((k, v) => MapEntry(k, v.toString()));
-        _activityCategoryNames = _activityCategories.values.where((v) => v != 'بدون دسته‌بندی').toSet().toList()..sort();
+        _activityCategoryNames = <String>{...(_activityCategories.values.where((v) => v != 'بدون دسته‌بندی')), ...(prefs.getStringList('activity_category_names_v1') ?? [])}.toList()..sort();
       });
     } catch (_) {}
   }
