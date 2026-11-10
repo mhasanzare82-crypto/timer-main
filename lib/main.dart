@@ -835,7 +835,7 @@ class _MainScreenState extends State<MainScreen> {
     final isRunning = activity.stopwatch.isRunning;
     final elapsed = activity.stopwatch.elapsed;
     final compactCounter = _persianDigits(
-      '${_twoDigits(elapsed.inMinutes)}:${_twoDigits(elapsed.inSeconds.remainder(60))}',
+      '${_twoDigits(elapsed.inHours)}:${_twoDigits(elapsed.inMinutes.remainder(60))}:${_twoDigits(elapsed.inSeconds.remainder(60))}',
     );
     final displayName = activity.name.trim().isEmpty
         ? 'فعالیت بدون نام'
@@ -853,52 +853,38 @@ class _MainScreenState extends State<MainScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _accentColor.withValues(alpha: 0.09),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    compactCounter,
-                    textDirection: TextDirection.ltr,
-                    style: TextStyle(
-                      color: _accentColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 21,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                      letterSpacing: 1,
+            Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 116,
+                    child: Text(
+                      compactCounter,
+                      textAlign: TextAlign.center,
+                      textDirection: TextDirection.ltr,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 19,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                        letterSpacing: 1,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    displayName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.w500),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isRunning ? const Color(0xFFE8F5E9) : const Color(0xFFF1F2F5),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    isRunning ? 'فعال' : 'مکث',
-                    style: TextStyle(
-                      color: isRunning ? Colors.green.shade800 : Colors.black54,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
+                  const SizedBox(width: 10),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 130),
+                    child: Text(
+                      displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w500),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: 10),
             Row(
