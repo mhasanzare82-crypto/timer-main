@@ -834,64 +834,82 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _buildTimeEntryPage() {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
-          decoration: BoxDecoration(
-            color: _accentColor,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: _accentColor.withValues(alpha: 0.20),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Text(
-                _persianDigits(_jalaliDate(_now)),
-                style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                _clockTime(_now),
-                textDirection: TextDirection.ltr,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 38,
-                  fontWeight: FontWeight.bold,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                  letterSpacing: 2,
-                ),
-              ),
-              if (_runningActivities.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                ..._runningActivities.map(_buildRunningActivityCard),
-              ],
-              const SizedBox(height: 5),
-              const Text('ساعت فعلی', style: TextStyle(color: Colors.white70, fontSize: 13)),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _createActivityTimer,
-                  icon: const Icon(Icons.add_circle_outline_rounded),
-                  label: const Text('فعالیت جدید'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: _accentColor,
-                    padding: const EdgeInsets.symmetric(vertical: 13),
+    return SafeArea(
+      child: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+              children: [
+                // ساعت و تاریخ در بالای صفحه، جدا از کنترل‌های فعالیت
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: _accentColor,
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        _persianDigits(_jalaliDate(_now)),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        _clockTime(_now),
+                        textDirection: TextDirection.ltr,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                          letterSpacing: 2,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      const Text(
+                        'ساعت فعلی',
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 18),
+                if (_runningActivities.isNotEmpty) ...[
+                  ..._runningActivities.map(_buildRunningActivityCard),
+                  const SizedBox(height: 10),
+                ],
+                Center(
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _createActivityTimer,
+                      icon: const Icon(Icons.add_rounded, size: 23),
+                      label: const Text(
+                        'فعالیت جدید',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _accentColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -907,13 +925,13 @@ class _MainScreenState extends State<MainScreen> {
     return Card(
       margin: const EdgeInsets.only(bottom: 2),
       elevation: 0,
-      color: Colors.transparent,
+      color: Colors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide.none,
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(color: Color(0xFFE8EAF0)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
+        padding: const EdgeInsets.all(13),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
