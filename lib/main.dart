@@ -276,6 +276,7 @@ class _MainScreenState extends State<MainScreen> {
   List<_SavedActivity> _savedActivities = [];
   List<String> _activityNames = [];
   Map<String, String> _activityCategories = {};
+  List<String> _activityCategoryNames = [];
   List<_Checklist> _checklists = [];
 
   @override
@@ -343,7 +344,10 @@ class _MainScreenState extends State<MainScreen> {
     try {
       final decoded = Map<String, dynamic>.from(jsonDecode(raw) as Map);
       if (!mounted) return;
-      setState(() => _activityCategories = decoded.map((k, v) => MapEntry(k, v.toString())));
+      setState(() {
+        _activityCategories = decoded.map((k, v) => MapEntry(k, v.toString()));
+        _activityCategoryNames = _activityCategories.values.where((v) => v != 'بدون دسته‌بندی').toSet().toList()..sort();
+      });
     } catch (_) {}
   }
 
@@ -362,6 +366,109 @@ class _MainScreenState extends State<MainScreen> {
     if (category == null || !mounted) return;
     setState(() => _activityCategories[name] = category);
     await _persistActivityCategories();
+  }
+
+  Future<void> _persistActivityCategoryNames() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('activity_category_names_v1', _activityCategoryNames);
+  }
+
+  Future<void> _manageActivityCategories() async {
+    final controller = TextEditingController();
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, refresh) => AlertDialog(
+        title: const Text('مدیریت دسته‌بندی‌ها'),
+        content: SizedBox(width: double.maxFinite, child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(children: [
+              Expanded(child: TextField(controller: controller, decoration: const InputDecoration(hintText: 'نام دسته‌بندی جدید'))),
+              IconButton(icon: const Icon(Icons.add_circle, color: Colors.green), onPressed: () {
+                final name = controller.text.trim();
+                if (name.isEmpty || _activityCategoryNames.contains(name)) return;
+                setState(() { _activityCategoryNames.add(name); _activityCategoryNames.sort(); });
+                controller.clear(); refresh(() {});
+                _persistActivityCategoryNames();
+              }),
+            ]),
+            const Divider(),
+            if (_activityCategoryNames.isEmpty) const Text('هنوز دسته‌بندی‌ای ایجاد نشده است.'),
+            ..._activityCategoryNames.map((category) => ListTile(
+              dense: true, title: Text(category),
+              trailing: Wrap(children: [
+                IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () async {
+                  final edited = await _askChecklistText(title: 'ویرایش دسته‌بندی', hint: 'نام دسته‌بندی', initial: category);
+                  if (edited == null || edited.trim().isEmpty || !mounted) return;
+                  setState(() {
+                    _activityCategoryNames = _activityCategoryNames.map((c) => c == category ? edited.trim() : c).toSet().toList()..sort();
+                    _activityCategories.updateAll((key, value) => value == category ? edited.trim() : value);
+                  });
+                  await _persistActivityCategoryNames(); await _persistActivityCategories();
+                  refresh(() {});
+                }),
+                IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () async {
+                  final ok = await showDialog<bool>(context: ctx, builder: (d) => AlertDialog(
+                    title: const Text('حذف دسته‌بندی'),
+                    content: Text('دسته‌بندی «$category» حذف شود؟ فعالیت‌های آن به «بدون دسته‌بندی» منتقل می‌شوند.'),
+                    actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('انصراف')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('حذف'))],
+                  ));
+                  if (ok != true || !mounted) return;
+                  setState(() {
+                    _activityCategoryNames.remove(category);
+                    _activityCategories.updateAll((key, value) => value == category ? 'بدون دسته‌بندی' : value);
+                  });
+                  await _persistActivityCategoryNames(); await _persistActivityCategories();
+                  refresh(() {});
+                }),
+              ]),
+            )),
+          ],
+        )),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('بستن'))],
+      )),
+    );
+    controller.dispose();
+  }
+
+  Future<void> _editActivityName(String oldName) async {
+    final edited = await _askChecklistText(title: 'ویرایش فعالیت', hint: 'نام فعالیت', initial: oldName);
+    if (edited == null || edited.trim().isEmpty || !mounted) return;
+    final newName = edited.trim();
+    if (newName != oldName && _activityNames.any((n) => n.toLowerCase() == newName.toLowerCase())) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('این نام قبلاً استفاده شده است.')));
+      return;
+    }
+    setState(() {
+      _activityNames = _activityNames.map((n) => n == oldName ? newName : n).toList()..sort();
+      if (_activityCategories.containsKey(oldName)) {
+        _activityCategories[newName] = _activityCategories.remove(oldName)!;
+      }
+      _savedActivities = _savedActivities.map((a) => a.name == oldName ? _SavedActivity(
+        name: newName, startDate: a.startDate, startTime: a.startTime,
+        endDate: a.endDate, endTime: a.endTime, durationSeconds: a.durationSeconds,
+      ) : a).toList();
+      for (final running in _runningActivities.where((a) => a.name == oldName)) {
+        running.name = newName; running.nameController.text = newName;
+      }
+    });
+    await _persistActivityNames(); await _persistActivityCategories(); await _persistActivities();
+  }
+
+  Future<void> _deleteActivity(String name) async {
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('حذف فعالیت'),
+      content: Text('فعالیت «$name» و تمام سوابق زمانی آن حذف شوند؟ این کار قابل بازگشت نیست.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('حذف'))],
+    ));
+    if (ok != true || !mounted) return;
+    setState(() {
+      _activityNames.remove(name); _activityCategories.remove(name);
+      _savedActivities.removeWhere((a) => a.name == name);
+      final running = _runningActivities.where((a) => a.name == name).toList();
+      for (final item in running) { _runningActivities.remove(item); item.dispose(); }
+    });
+    await _persistActivityNames(); await _persistActivityCategories(); await _persistActivities();
   }
 
   Future<void> _openActivityDetails(String name) async {
@@ -1582,7 +1689,7 @@ class _MainScreenState extends State<MainScreen> {
       final category = _activityCategories[name] ?? 'بدون دسته‌بندی';
       (grouped[category] ??= []).add(name);
     }
-    final categories = grouped.keys.toList()..sort();
+    final categories = {...grouped.keys, ..._activityCategoryNames}.toList()..sort();
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -1598,6 +1705,8 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
         const SizedBox(height: 8),
+        Align(alignment: Alignment.centerLeft, child: OutlinedButton.icon(
+          onPressed: _manageActivityCategories, icon: const Icon(Icons.folder_manage_outlined), label: const Text('مدیریت دسته‌بندی‌ها'))),
         const Text(
           'برای مشاهده سوابق، روی فعالیت بزن. هر فعالیت را می‌توانی در یک دسته‌بندی قرار بدهی.',
           style: TextStyle(color: Colors.black54, height: 1.6),
@@ -1641,9 +1750,13 @@ class _MainScreenState extends State<MainScreen> {
                       textDirection: TextDirection.ltr,
                       style: TextStyle(color: _accentColor, fontWeight: FontWeight.bold)),
                     PopupMenuButton<String>(
-                      tooltip: 'دسته‌بندی',
+                      tooltip: 'مدیریت فعالیت',
                       onSelected: (value) {
-                        if (value == '__new__') {
+                        if (value == '__edit_activity__') {
+                          _editActivityName(name);
+                        } else if (value == '__delete_activity__') {
+                          _deleteActivity(name);
+                        } else if (value == '__new__') {
                           _setActivityCategory(name);
                         } else {
                           setState(() => _activityCategories[name] = value);
@@ -1651,6 +1764,9 @@ class _MainScreenState extends State<MainScreen> {
                         }
                       },
                       itemBuilder: (_) => [
+                        const PopupMenuItem(value: '__edit_activity__', child: Text('ویرایش نام فعالیت')),
+                        const PopupMenuItem(value: '__delete_activity__', child: Text('حذف فعالیت', style: TextStyle(color: Colors.red))),
+                        const PopupMenuDivider(),
                         const PopupMenuItem(value: '__new__', child: Text('تعیین دسته‌بندی جدید')),
                         const PopupMenuDivider(),
                         ...categories.where((c) => c != category).map((c) =>
