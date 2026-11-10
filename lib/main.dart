@@ -724,7 +724,7 @@ class _MainScreenState extends State<MainScreen> {
           s = s.replaceAll(fa[i], '$i').replaceAll(ar[i], '$i');
         }
         return int.parse(s.replaceAll(RegExp(r'[^0-9]'), ''));
-      }\n        return int.parse(s.replaceAll(RegExp(r'[^0-9]'), ''));\n      }
+      }
       final d = item.startDate.split('/');
       final t = item.startTime.split(':');
       return Jalali(n(d[0]), n(d[1]), n(d[2])).toDateTime().add(Duration(hours: n(t[0]), minutes: n(t[1]), seconds: t.length > 2 ? n(t[2]) : 0));
