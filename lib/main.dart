@@ -4,6 +4,10 @@ import 'dart:io';
 import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest.dart' as tzdata;
+import 'package:timezone/timezone.dart' as tz;
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -11,8 +15,13 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
+final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  tzdata.initializeTimeZones();
+  const initSettings = InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher'));
+  await _notifications.initialize(initSettings);
   runApp(const TimerApp());
 }
 
@@ -96,6 +105,12 @@ class _RunningActivity {
   }
 }
 
+class _CountdownTimer {
+  final int id; final String title; final int totalSeconds;
+  int remainingSeconds; DateTime? endsAt; bool running=false; bool finished=false;
+  _CountdownTimer({required this.id, required this.title, required this.totalSeconds}) : remainingSeconds=totalSeconds;
+}
+
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -122,6 +137,9 @@ class _MainScreenState extends State<MainScreen> {
   DateTime? _reportStartDate;
   DateTime? _reportEndDate;
   final Set<String> _reportSelectedNames = {};
+  final List<_CountdownTimer> _countdowns=[];
+  Timer? _countdownTicker;
+  int _wheelHours=0, _wheelMinutes=5, _wheelSeconds=0, _nextCountdownId=1000;
   Timer? _clock;
   final List<_RunningActivity> _runningActivities = [];
   List<_SavedActivity> _savedActivities = [];
@@ -134,11 +152,14 @@ class _MainScreenState extends State<MainScreen> {
       if (mounted) setState(() => _now = DateTime.now());
     });
     _initializeData();
+    _initializeAlarmNotifications();
+    _countdownTicker=Timer.periodic(const Duration(seconds:1), (_) => _tickCountdowns());
   }
 
   @override
   void dispose() {
     _clock?.cancel();
+    _countdownTicker?.cancel();
     for (final activity in _runningActivities) {
       activity.stopwatch.stop();
     }
@@ -386,11 +407,7 @@ class _MainScreenState extends State<MainScreen> {
           _buildTimeEntryPage(),
           _buildActivitiesPage(),
           _buildReportsPage(),
-          _buildPlaceholder(
-            Icons.hourglass_bottom_rounded,
-            'تایمر معکوس',
-            'بخش تایمر معکوس در مرحله بعدی تکمیل می‌شود.',
-          ),
+          _buildCountdownPage(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -785,6 +802,133 @@ class _MainScreenState extends State<MainScreen> {
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در بازیابی: ' + e.toString())));
     }
+  }
+
+
+  Future<void> _initializeAlarmNotifications() async {
+    final android=_notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    await android?.requestNotificationsPermission();
+    await android?.requestExactAlarmsPermission();
+    const channel=AndroidNotificationChannel('countdown_alarm_channel','هشدار پایان تایمر',
+      description:'هشدار صوتی هنگام پایان تایمر معکوس',importance:Importance.max,playSound:true,enableVibration:true);
+    await android?.createNotificationChannel(channel);
+  }
+  NotificationDetails get _alarmDetails => const NotificationDetails(android:AndroidNotificationDetails(
+    'countdown_alarm_channel','هشدار پایان تایمر',channelDescription:'هشدار صوتی هنگام پایان تایمر معکوس',
+    importance:Importance.max,priority:Priority.max,playSound:true,enableVibration:true,
+    category:AndroidNotificationCategory.alarm,audioAttributesUsage:AudioAttributesUsage.alarm));
+  Future<void> _scheduleCountdownAlarm(_CountdownTimer item) async {
+    if(item.endsAt==null)return;
+    await _notifications.zonedSchedule(item.id,'زمان تایمر به پایان رسید',item.title,
+      tz.TZDateTime.from(item.endsAt!,tz.local),_alarmDetails,
+      androidScheduleMode:AndroidScheduleMode.exactAllowWhileIdle,payload:'countdown:'+item.id.toString());
+  }
+  void _tickCountdowns(){
+    var changed=false;
+    for(final item in _countdowns){
+      if(!item.running||item.endsAt==null)continue;
+      final left=item.endsAt!.difference(DateTime.now()).inSeconds;
+      final next=left<=0?0:left;
+      if(next!=item.remainingSeconds){item.remainingSeconds=next;changed=true;}
+      if(next<=0){item.running=false;item.finished=true;item.endsAt=null;_finishCountdown(item);changed=true;}
+    }
+    if(changed&&mounted)setState((){});
+  }
+  Future<void> _finishCountdown(_CountdownTimer item) async {
+    await _notifications.cancel(item.id);
+    await _notifications.show(item.id,'پایان تایمر','زمان «'+item.title+'» به پایان رسید.',_alarmDetails,payload:'countdown:'+item.id.toString());
+    SystemSound.play(SystemSoundType.alert);
+  }
+  void _addCountdown(){
+    final seconds=_wheelHours*3600+_wheelMinutes*60+_wheelSeconds;
+    if(seconds<=0){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('ابتدا یک زمان بیشتر از صفر انتخاب کن.')));return;}
+    setState(()=>_countdowns.add(_CountdownTimer(id:_nextCountdownId++,title:'تایمر '+(_countdowns.length+1).toString(),totalSeconds:seconds)));
+  }
+  Future<void> _startCountdown(_CountdownTimer item) async {
+    if(item.running||item.remainingSeconds<=0)return;
+    setState(()=>{item.running=true,item.finished=false,item.endsAt=DateTime.now().add(Duration(seconds:item.remainingSeconds))});
+    await _scheduleCountdownAlarm(item);
+  }
+  Future<void> _pauseCountdown(_CountdownTimer item) async {
+    if(!item.running)return;
+    final remaining=item.endsAt!.difference(DateTime.now()).inSeconds;
+    await _notifications.cancel(item.id);
+    setState(()=>{item.remainingSeconds=remaining<0?0:remaining,item.running=false,item.endsAt=null});
+  }
+  Future<void> _stopCountdown(_CountdownTimer item) async {
+    await _notifications.cancel(item.id);
+    setState(()=>{item.running=false,item.finished=false,item.endsAt=null,item.remainingSeconds=item.totalSeconds});
+  }
+  String _countdownText(int seconds){
+    final h=seconds~/3600,m=(seconds%3600)~/60,s=seconds%60;
+    return _persianDigits(_twoDigits(h)+':'+_twoDigits(m)+':'+_twoDigits(s));
+  }
+  Widget _wheelPicker(String label,int max,int selected,ValueChanged<int> onChanged){
+    return Expanded(child:Column(mainAxisSize:MainAxisSize.min,children:[
+      Text(label,style:const TextStyle(color:Colors.black54,fontWeight:FontWeight.w600)),
+      const SizedBox(height:6),
+      SizedBox(height:154,child:ListWheelScrollView.useDelegate(
+        itemExtent:42,perspective:0.003,diameterRatio:1.5,physics:const FixedExtentScrollPhysics(),
+        onSelectedItemChanged:onChanged,controller:FixedExtentScrollController(initialItem:selected),
+        childDelegate:ListWheelChildBuilderDelegate(childCount:max+1,builder:(context,index)=>Center(child:Text(
+          _persianDigits(_twoDigits(index)),style:TextStyle(fontSize:index==selected?25:18,
+          fontWeight:index==selected?FontWeight.bold:FontWeight.normal,color:index==selected?_accentColor:Colors.black45))))),
+      )),
+    ]));
+  }
+  Widget _buildCountdownPage(){
+    final selectedSeconds=_wheelHours*3600+_wheelMinutes*60+_wheelSeconds;
+    return ListView(padding:const EdgeInsets.all(16),children:[
+      const Text('تنظیم تایمر جدید',style:TextStyle(fontSize:19,fontWeight:FontWeight.bold)),
+      const SizedBox(height:8),const Text('ساعت، دقیقه و ثانیه را با حرکت دادن چرخ‌ها انتخاب کن.'),
+      const SizedBox(height:12),
+      Container(padding:const EdgeInsets.all(12),decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(20)),
+        child:Column(children:[
+          Row(children:[
+            _wheelPicker('ساعت',99,_wheelHours,(v)=>setState(()=>_wheelHours=v)),
+            _wheelPicker('دقیقه',59,_wheelMinutes,(v)=>setState(()=>_wheelMinutes=v)),
+            _wheelPicker('ثانیه',59,_wheelSeconds,(v)=>setState(()=>_wheelSeconds=v)),
+          ]),
+          Text(_countdownText(selectedSeconds),style:TextStyle(fontSize:24,fontWeight:FontWeight.bold,color:_accentColor)),
+          const SizedBox(height:12),
+          SizedBox(width:double.infinity,child:FilledButton.icon(onPressed:_addCountdown,icon:const Icon(Icons.add_alarm),
+            label:const Text('افزودن تایمر'),style:FilledButton.styleFrom(backgroundColor:_accentColor))),
+        ])),
+      const SizedBox(height:22),
+      Row(children:[const Expanded(child:Text('تایمرهای من',style:TextStyle(fontSize:19,fontWeight:FontWeight.bold))),
+        Text(_persianDigits(_countdowns.length.toString()),style:TextStyle(color:_accentColor,fontWeight:FontWeight.bold))]),
+      const SizedBox(height:10),
+      if(_countdowns.isEmpty) const Padding(padding:EdgeInsets.all(24),child:Center(child:Text('هنوز تایمری اضافه نشده است.')))
+      else ..._countdowns.map(_buildCountdownCard),
+    ]);
+  }
+  Widget _buildCountdownCard(_CountdownTimer item){
+    final progress=item.totalSeconds==0?0.0:(item.remainingSeconds/item.totalSeconds).clamp(0.0,1.0);
+    return Container(margin:const EdgeInsets.only(bottom:12),padding:const EdgeInsets.all(14),
+      decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(20),border:Border.all(color:const Color(0xFFE8EAF0))),
+      child:Column(children:[
+        Row(children:[Expanded(child:Text(item.title,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:16))),
+          IconButton(tooltip:'حذف تایمر',onPressed:()async{await _notifications.cancel(item.id);if(mounted)setState(()=>_countdowns.remove(item));},
+            icon:const Icon(Icons.delete_outline,color:Colors.redAccent))]),
+        const SizedBox(height:8),
+        SizedBox(width:174,height:174,child:Stack(alignment:Alignment.center,children:[
+          SizedBox.expand(child:CircularProgressIndicator(value:progress,strokeWidth:11,strokeCap:StrokeCap.round,
+            backgroundColor:const Color(0xFFE9ECF3),valueColor:AlwaysStoppedAnimation<Color>(_accentColor))),
+          Column(mainAxisSize:MainAxisSize.min,children:[
+            Text(_countdownText(item.remainingSeconds),textDirection:TextDirection.ltr,
+              style:const TextStyle(fontSize:25,fontWeight:FontWeight.bold,fontFeatures:[FontFeature.tabularFigures()])),
+            const SizedBox(height:4),Text(item.finished?'پایان یافته':item.running?'در حال شمارش':'متوقف',style:const TextStyle(color:Colors.black54,fontSize:12)),
+          ]),
+        ])),
+        const SizedBox(height:12),
+        Row(children:[
+          Expanded(child:FilledButton.icon(onPressed:item.running||item.remainingSeconds==0?null:()=>_startCountdown(item),icon:const Icon(Icons.play_arrow),label:const Text('شروع'))),
+          const SizedBox(width:8),
+          Expanded(child:OutlinedButton.icon(onPressed:item.running?()=>_pauseCountdown(item):null,icon:const Icon(Icons.pause),label:const Text('مکث'))),
+          const SizedBox(width:8),
+          Expanded(child:OutlinedButton.icon(onPressed:()=>_stopCountdown(item),icon:const Icon(Icons.stop),label:const Text('توقف'))),
+        ]),
+      ]));
   }
 
   Widget _buildActivitiesPage() {
