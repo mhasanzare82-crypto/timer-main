@@ -125,8 +125,7 @@ class _MainScreenState extends State<MainScreen> {
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _now = DateTime.now());
     });
-    _loadActivities();
-    _loadActivityNames();
+    _initializeData();
   }
 
   @override
@@ -136,6 +135,11 @@ class _MainScreenState extends State<MainScreen> {
       activity.stopwatch.stop();
     }
     super.dispose();
+  }
+
+  Future<void> _initializeData() async {
+    await _loadActivities();
+    await _loadActivityNames();
   }
 
   Future<void> _loadActivities() async {
