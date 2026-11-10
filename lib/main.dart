@@ -804,12 +804,12 @@ class _MainScreenState extends State<MainScreen> {
                   letterSpacing: 2,
                 ),
               ),
-              const SizedBox(height: 5),
-              const Text('ساعت فعلی', style: TextStyle(color: Colors.white70, fontSize: 13)),
               if (_runningActivities.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 ..._runningActivities.map(_buildRunningActivityCard),
               ],
+              const SizedBox(height: 5),
+              const Text('ساعت فعلی', style: TextStyle(color: Colors.white70, fontSize: 13)),
               const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
