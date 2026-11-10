@@ -424,7 +424,7 @@ class _MainScreenState extends State<MainScreen> {
                 IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () async {
                   final ok = await showDialog<bool>(context: ctx, builder: (d) => AlertDialog(
                     title: const Text('حذف پوشه'),
-                    content: Text('دسته‌بندی «$category» حذف شود؟ فعالیت‌های آن به «بدون دسته‌بندی» منتقل می‌شوند.'),
+                    content: Text('پوشه «$category» حذف شود؟ فعالیت‌های آن به «بدون پوشه» منتقل می‌شوند.'),
                     actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('انصراف')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('حذف'))],
                   ));
                   if (ok != true || !mounted) return;
