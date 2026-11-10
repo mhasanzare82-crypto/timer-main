@@ -13,6 +13,10 @@ dependencies:
     sdk: flutter
   shamsi_date: ^1.1.0
   shared_preferences: ^2.5.3
+  excel: ^4.0.6
+  file_picker: ^10.1.2
+  path_provider: ^2.1.5
+  share_plus: ^11.0.0
 
 dev_dependencies:
   flutter_test:
