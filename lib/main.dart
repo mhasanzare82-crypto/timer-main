@@ -1706,7 +1706,7 @@ class _MainScreenState extends State<MainScreen> {
         ),
         const SizedBox(height: 8),
         Align(alignment: Alignment.centerLeft, child: OutlinedButton.icon(
-          onPressed: _manageActivityCategories, icon: const Icon(Icons.folder_manage_outlined), label: const Text('مدیریت دسته‌بندی‌ها'))),
+          onPressed: _manageActivityCategories, icon: const Icon(Icons.folder_outlined), label: const Text('مدیریت دسته‌بندی‌ها'))),
         const Text(
           'برای مشاهده سوابق، روی فعالیت بزن. هر فعالیت را می‌توانی در یک دسته‌بندی قرار بدهی.',
           style: TextStyle(color: Colors.black54, height: 1.6),
