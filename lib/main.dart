@@ -854,36 +854,42 @@ class _MainScreenState extends State<MainScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 116,
-                    child: Text(
-                      compactCounter,
-                      textAlign: TextAlign.center,
-                      textDirection: TextDirection.ltr,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 19,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                        letterSpacing: 1,
+              child: SizedBox(
+                width: 250,
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 116,
+                      child: Text(
+                        compactCounter,
+                        textAlign: TextAlign.center,
+                        textDirection: TextDirection.ltr,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 19,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                          letterSpacing: 1,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 130),
-                    child: Text(
-                      displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w500),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 124,
+                      child: Text(
+                        displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 10),
