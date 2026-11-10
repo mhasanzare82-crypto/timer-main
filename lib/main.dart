@@ -843,8 +843,103 @@ class _MainScreenState extends State<MainScreen> {
   }).toList();
 
   Future<void> _pickReportDate(bool start) async {
-    final d = await showDatePicker(context: context, initialDate: (start ? _reportStartDate : _reportEndDate) ?? DateTime.now(), firstDate: DateTime(2000), lastDate: DateTime(2100));
-    if (d != null) setState(() { if (start) { _reportStartDate = d; } else { _reportEndDate = d; } });
+    final current = (start ? _reportStartDate : _reportEndDate) ?? DateTime.now();
+    final initial = Jalali.fromDateTime(current);
+    const months = [
+      'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
+      'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند',
+    ];
+    var year = initial.year;
+    var month = initial.month;
+    var day = initial.day;
+
+    final selected = await showDialog<Jalali>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final monthLength = Jalali(year, month, 1).monthLength;
+          if (day > monthLength) day = monthLength;
+          return AlertDialog(
+            title: Text(start ? 'انتخاب تاریخ شروع' : 'انتخاب تاریخ پایان'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(children: [
+                  Expanded(
+                    flex: 2,
+                    child: DropdownButtonFormField<int>(
+                      value: year, isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'سال', border: OutlineInputBorder()),
+                      items: List.generate(201, (i) => 1300 + i)
+                        .map((v) => DropdownMenuItem(value: v, child: Text(_persianDigits(v.toString())))).toList(),
+                      onChanged: (v) {
+                        if (v == null) return;
+                        setDialogState(() {
+                          year = v;
+                          final length = Jalali(year, month, 1).monthLength;
+                          if (day > length) day = length;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 3,
+                    child: DropdownButtonFormField<int>(
+                      value: month, isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'ماه', border: OutlineInputBorder()),
+                      items: List.generate(12, (i) => i + 1)
+                        .map((v) => DropdownMenuItem(value: v, child: Text(months[v - 1]))).toList(),
+                      onChanged: (v) {
+                        if (v == null) return;
+                        setDialogState(() {
+                          month = v;
+                          final length = Jalali(year, month, 1).monthLength;
+                          if (day > length) day = length;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: DropdownButtonFormField<int>(
+                      value: day, isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'روز', border: OutlineInputBorder()),
+                      items: List.generate(monthLength, (i) => i + 1)
+                        .map((v) => DropdownMenuItem(value: v, child: Text(_persianDigits(v.toString())))).toList(),
+                      onChanged: (v) { if (v != null) setDialogState(() => day = v); },
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 14),
+                Text(
+                  _persianDigits(year.toString() + '/' + _twoDigits(month) + '/' + _twoDigits(day)),
+                  style: TextStyle(color: _accentColor, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('انصراف')),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, Jalali(year, month, day)),
+                child: const Text('تأیید'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (selected == null || !mounted) return;
+    final gregorian = selected.toDateTime();
+    setState(() {
+      if (start) {
+        _reportStartDate = DateTime(gregorian.year, gregorian.month, gregorian.day);
+      } else {
+        _reportEndDate = DateTime(gregorian.year, gregorian.month, gregorian.day);
+      }
+    });
   }
 
   Future<void> _exportExcel() async {
