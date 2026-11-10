@@ -691,12 +691,6 @@ class _MainScreenState extends State<MainScreen> {
               const SizedBox(height: 5),
               const Text('ساعت فعلی', style: TextStyle(color: Colors.white70, fontSize: 13)),
               const SizedBox(height: 18),
-              if (_runningActivities.isNotEmpty) ...[
-                const Divider(color: Colors.white30, height: 1),
-                const SizedBox(height: 14),
-                ..._runningActivities.map(_buildRunningActivityCard),
-                const SizedBox(height: 4),
-              ],
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -713,114 +707,168 @@ class _MainScreenState extends State<MainScreen> {
             ],
           ),
         ),
+        if (_runningActivities.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          ..._runningActivities.map(_buildRunningActivityCard),
+        ],
       ],
     );
   }
 
   Widget _buildRunningActivityCard(_RunningActivity activity) {
     final isRunning = activity.stopwatch.isRunning;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FC),
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: const Color(0xFFE8EAF0)),
+    final elapsed = activity.stopwatch.elapsed;
+    final compactCounter = _persianDigits(
+      '${_twoDigits(elapsed.inMinutes)}:${_twoDigits(elapsed.inSeconds.remainder(60))}',
+    );
+    final displayName = activity.name.trim().isEmpty
+        ? 'فعالیت بدون نام'
+        : activity.name.trim();
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E6EF)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _durationText(activity.stopwatch.elapsed),
-                  textDirection: TextDirection.ltr,
-                  style: TextStyle(
-                    color: _accentColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 22,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+      child: Padding(
+        padding: const EdgeInsets.all(13),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _accentColor.withValues(alpha: 0.09),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ),
-              ),
-              Text(
-                isRunning ? 'در حال اجرا' : 'مکث شده',
-                style: TextStyle(
-                  color: isRunning ? Colors.green.shade700 : Colors.black54,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: activity.nameController,
-                  textInputAction: TextInputAction.done,
-                  decoration: InputDecoration(
-                    hintText: 'نام فعالیت',
-                    isDense: true,
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                  child: Text(
+                    compactCounter,
+                    textDirection: TextDirection.ltr,
+                    style: TextStyle(
+                      color: _accentColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 21,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      letterSpacing: 1,
                     ),
                   ),
-                  onChanged: (value) => activity.name = value,
-                  onSubmitted: (_) => _saveActivityName(activity),
                 ),
-              ),
-              const SizedBox(width: 8),
-              IconButton.filled(
-                tooltip: 'ذخیره نام فعالیت',
-                onPressed: () => _saveActivityName(activity),
-                icon: const Icon(Icons.save_outlined),
-                style: IconButton.styleFrom(backgroundColor: _accentColor, foregroundColor: Colors.white),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: isRunning ? null : () => _startActivity(activity),
-                  icon: const Icon(Icons.play_arrow_rounded, size: 19),
-                  label: const Text('شروع'),
-                  style: OutlinedButton.styleFrom(foregroundColor: _accentColor, padding: const EdgeInsets.symmetric(vertical: 9)),
-                ),
-              ),
-              const SizedBox(width: 7),
-              Expanded(
-                child: FilledButton.tonalIcon(
-                  onPressed: isRunning ? () => _pauseActivity(activity) : null,
-                  icon: const Icon(Icons.pause_rounded, size: 18),
-                  label: const Text('مکث'),
-                  style: FilledButton.styleFrom(foregroundColor: _accentColor, padding: const EdgeInsets.symmetric(vertical: 9)),
-                ),
-              ),
-              const SizedBox(width: 7),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () => _stopActivity(activity),
-                  icon: const Icon(Icons.stop_rounded, size: 18),
-                  label: const Text('توقف'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFE8E8),
-                    foregroundColor: const Color(0xFFC62828),
-                    padding: const EdgeInsets.symmetric(vertical: 9),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.w500),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isRunning ? const Color(0xFFE8F5E9) : const Color(0xFFF1F2F5),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    isRunning ? 'فعال' : 'مکث',
+                    style: TextStyle(
+                      color: isRunning ? Colors.green.shade800 : Colors.black54,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: activity.nameController,
+                    textInputAction: TextInputAction.done,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'نام فعالیت',
+                      isDense: true,
+                      filled: true,
+                      fillColor: const Color(0xFFF7F8FC),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onChanged: (value) {
+                      activity.name = value;
+                      if (mounted) setState(() {});
+                    },
+                    onSubmitted: (_) => _saveActivityName(activity),
+                  ),
+                ),
+                const SizedBox(width: 7),
+                IconButton.filled(
+                  tooltip: 'ذخیره نام فعالیت',
+                  onPressed: () => _saveActivityName(activity),
+                  icon: const Icon(Icons.save_outlined, size: 19),
+                  style: IconButton.styleFrom(
+                    backgroundColor: _accentColor,
+                    foregroundColor: Colors.white,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 9),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: isRunning ? null : () => _startActivity(activity),
+                    icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                    label: const Text('شروع'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _accentColor,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: isRunning ? () => _pauseActivity(activity) : null,
+                    icon: const Icon(Icons.pause_rounded, size: 18),
+                    label: const Text('مکث'),
+                    style: FilledButton.styleFrom(
+                      foregroundColor: _accentColor,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => _stopActivity(activity),
+                    icon: const Icon(Icons.stop_rounded, size: 18),
+                    label: const Text('توقف'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFE8E8),
+                      foregroundColor: const Color(0xFFC62828),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
