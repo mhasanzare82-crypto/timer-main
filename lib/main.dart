@@ -662,7 +662,7 @@ class _MainScreenState extends State<MainScreen> {
 
   DateTime? _reportDate(_SavedActivity item) {
     try {
-      int n(String s) => int.parse(s.replaceAll(RegExp(r'[^0-9]'), ''));
+      int n(String s) {\n        const fa = '۰۱۲۳۴۵۶۷۸۹';\n        const ar = '٠١٢٣٤٥٦٧٨٩';\n        for (var i = 0; i < 10; i++) {\n          s = s.replaceAll(fa[i], '$i').replaceAll(ar[i], '$i');\n        }\n        return int.parse(s.replaceAll(RegExp(r'[^0-9]'), ''));\n      }
       final d = item.startDate.split('/');
       final t = item.startTime.split(':');
       return Jalali(n(d[0]), n(d[1]), n(d[2])).toDateTime().add(Duration(hours: n(t[0]), minutes: n(t[1]), seconds: t.length > 2 ? n(t[2]) : 0));
