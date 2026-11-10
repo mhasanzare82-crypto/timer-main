@@ -841,15 +841,15 @@ class _MainScreenState extends State<MainScreen> {
         ? 'فعالیت بدون نام'
         : activity.name.trim();
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 2),
       elevation: 0,
-      color: Colors.white,
+      color: Colors.transparent,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFFE2E6EF)),
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide.none,
       ),
       child: Padding(
-        padding: const EdgeInsets.all(13),
+        padding: const EdgeInsets.symmetric(vertical: 2),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
