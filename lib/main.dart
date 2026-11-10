@@ -1,8 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
+import 'package:excel/excel.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -114,6 +119,9 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   Color _accentColor = _colors.first;
   DateTime _now = DateTime.now();
+  DateTime? _reportStartDate;
+  DateTime? _reportEndDate;
+  final Set<String> _reportSelectedNames = {};
   Timer? _clock;
   final List<_RunningActivity> _runningActivities = [];
   List<_SavedActivity> _savedActivities = [];
@@ -377,11 +385,7 @@ class _MainScreenState extends State<MainScreen> {
         children: [
           _buildTimeEntryPage(),
           _buildActivitiesPage(),
-          _buildPlaceholder(
-            Icons.bar_chart_rounded,
-            'گزارش‌گیری',
-            'بخش گزارش‌گیری در مرحله بعدی تکمیل می‌شود.',
-          ),
+          _buildReportsPage(),
           _buildPlaceholder(
             Icons.hourglass_bottom_rounded,
             'تایمر معکوس',
@@ -653,6 +657,134 @@ class _MainScreenState extends State<MainScreen> {
         ],
       ),
     );
+  }
+
+
+  DateTime? _reportDate(_SavedActivity item) {
+    try {
+      int n(String s) => int.parse(s.replaceAll(RegExp(r'[^0-9]'), ''));
+      final d = item.startDate.split('/');
+      final t = item.startTime.split(':');
+      return Jalali(n(d[0]), n(d[1]), n(d[2])).toDateTime().add(Duration(hours: n(t[0]), minutes: n(t[1]), seconds: t.length > 2 ? n(t[2]) : 0));
+    } catch (_) { return null; }
+  }
+
+  List<_SavedActivity> _reportRows() => _savedActivities.where((a) {
+    if (_reportSelectedNames.isNotEmpty && !_reportSelectedNames.contains(a.name)) return false;
+    final d = _reportDate(a);
+    if (d == null) return false;
+    if (_reportStartDate != null && d.isBefore(DateTime(_reportStartDate!.year, _reportStartDate!.month, _reportStartDate!.day))) return false;
+    if (_reportEndDate != null && d.isAfter(DateTime(_reportEndDate!.year, _reportEndDate!.month, _reportEndDate!.day, 23, 59, 59))) return false;
+    return true;
+  }).toList();
+
+  Future<void> _pickReportDate(bool start) async {
+    final d = await showDatePicker(context: context, initialDate: (start ? _reportStartDate : _reportEndDate) ?? DateTime.now(), firstDate: DateTime(2000), lastDate: DateTime(2100));
+    if (d != null) setState(() { if (start) { _reportStartDate = d; } else { _reportEndDate = d; } });
+  }
+
+  Future<void> _exportExcel() async {
+    final rows = _reportRows();
+    if (rows.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('برای این فیلترها گزارشی وجود ندارد.')));
+      return;
+    }
+    final book = Excel.createExcel();
+    final detail = book['جزئیات نوبت‌ها'];
+    detail.appendRow([TextCellValue('فعالیت'), TextCellValue('تاریخ شروع'), TextCellValue('ساعت شروع'), TextCellValue('تاریخ پایان'), TextCellValue('ساعت پایان'), TextCellValue('مدت (ثانیه)'), TextCellValue('مدت نوبت')]);
+    for (final a in rows) {
+      detail.appendRow([TextCellValue(a.name), TextCellValue(a.startDate), TextCellValue(a.startTime), TextCellValue(a.endDate), TextCellValue(a.endTime), IntCellValue(a.durationSeconds), TextCellValue(_durationText(Duration(seconds: a.durationSeconds)))]);
+    }
+    final byDay = <String, int>{};
+    final byName = <String, int>{};
+    for (final a in rows) {
+      final k = a.name + '|' + a.startDate;
+      byDay[k] = (byDay[k] ?? 0) + a.durationSeconds;
+      byName[a.name] = (byName[a.name] ?? 0) + a.durationSeconds;
+    }
+    final daily = book['جمع روزانه'];
+    daily.appendRow([TextCellValue('فعالیت'), TextCellValue('تاریخ'), TextCellValue('مجموع روز (ثانیه)'), TextCellValue('مجموع روز')]);
+    for (final e in byDay.entries) {
+      final p = e.key.split('|');
+      daily.appendRow([TextCellValue(p[0]), TextCellValue(p[1]), IntCellValue(e.value), TextCellValue(_durationText(Duration(seconds: e.value)))]);
+    }
+    final total = book['جمع کل'];
+    total.appendRow([TextCellValue('فعالیت'), TextCellValue('تعداد نوبت'), TextCellValue('مجموع کل (ثانیه)'), TextCellValue('مجموع کل')]);
+    for (final e in byName.entries) {
+      total.appendRow([TextCellValue(e.key), IntCellValue(rows.where((a) => a.name == e.key).length), IntCellValue(e.value), TextCellValue(_durationText(Duration(seconds: e.value)))]);
+    }
+    final bytes = book.encode();
+    if (bytes == null) return;
+    final dir = await getTemporaryDirectory();
+    final file = File(dir.path + '/time_report_' + DateTime.now().millisecondsSinceEpoch.toString() + '.xlsx');
+    await file.writeAsBytes(bytes, flush: true);
+    await Share.shareXFiles([XFile(file.path)], text: 'گزارش زمان فعالیت‌ها');
+  }
+
+  Widget _buildReportsPage() {
+    final rows = _reportRows();
+    final seconds = rows.fold<int>(0, (s, a) => s + a.durationSeconds);
+    return ListView(padding: const EdgeInsets.all(16), children: [
+      const Text('فیلتر گزارش', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+      Row(children: [
+        Expanded(child: OutlinedButton(onPressed: () => _pickReportDate(true), child: Text('از: ' + (_reportStartDate == null ? 'همه' : _jalaliDate(_reportStartDate!)))),
+        const SizedBox(width: 8),
+        Expanded(child: OutlinedButton(onPressed: () => _pickReportDate(false), child: Text('تا: ' + (_reportEndDate == null ? 'همه' : _jalaliDate(_reportEndDate!)))),
+      ]),
+      TextButton(onPressed: () => setState(() { _reportStartDate = null; _reportEndDate = null; _reportSelectedNames.clear(); }), child: const Text('پاک کردن فیلترها')),
+      const Text('فعالیت‌ها (بدون انتخاب، همه فعالیت‌ها):'),
+      Wrap(spacing: 8, children: _activityNames.map((n) => FilterChip(label: Text(n), selected: _reportSelectedNames.contains(n), onSelected: (v) => setState(() { if (v) { _reportSelectedNames.add(n); } else { _reportSelectedNames.remove(n); } }))).toList()),
+      const SizedBox(height: 12),
+      Text('تعداد نوبت: ' + _persianDigits(rows.length.toString()) + ' | مجموع: ' + _durationText(Duration(seconds: seconds))),
+      const SizedBox(height: 12),
+      FilledButton.icon(onPressed: _exportExcel, icon: const Icon(Icons.file_download), label: const Text('خروجی اکسل (.xlsx)')),
+      const SizedBox(height: 24),
+      const Text('پشتیبان‌گیری و بازیابی', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+      const Text('فهرست فعالیت‌ها و سوابق ثبت‌شده در فایل پشتیبان ذخیره می‌شوند.'),
+      OutlinedButton.icon(onPressed: _backupData, icon: const Icon(Icons.backup), label: const Text('تهیه فایل پشتیبان')),
+      OutlinedButton.icon(onPressed: _restoreData, icon: const Icon(Icons.settings_backup_restore), label: const Text('بازیابی از فایل پشتیبان')),
+    ]);
+  }
+
+  Future<void> _backupData() async {
+    final content = const JsonEncoder.withIndent('  ').convert({
+      'format': 'timer_main_backup',
+      'version': 1,
+      'activityNames': _activityNames,
+      'savedActivities': _savedActivities.map((a) => a.toJson()).toList(),
+    });
+    final path = await FilePicker.platform.saveFile(
+      dialogTitle: 'ذخیره فایل پشتیبان',
+      fileName: 'timer_backup.json',
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+      bytes: utf8.encode(content),
+    );
+    if (path != null && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('فایل پشتیبان ذخیره شد.')));
+  }
+
+  Future<void> _restoreData() async {
+    final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['json'], withData: true);
+    if (picked == null || picked.files.single.bytes == null || !mounted) return;
+    try {
+      final data = jsonDecode(utf8.decode(picked.files.single.bytes!)) as Map<String, dynamic>;
+      if (data['format'] != 'timer_main_backup' || data['version'] != 1) throw const FormatException('فایل پشتیبان معتبر نیست.');
+      final names = (data['activityNames'] as List<dynamic>).cast<String>().toSet().toList();
+      final saved = (data['savedActivities'] as List<dynamic>).map((e) => _SavedActivity.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+      final yes = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+        title: const Text('بازیابی اطلاعات'),
+        content: const Text('اطلاعات فعلی با فایل پشتیبان جایگزین می‌شود. ادامه می‌دهی؟'),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('بازیابی'))],
+      ));
+      if (yes != true || !mounted) return;
+      setState(() { _activityNames = names..sort(); _savedActivities = saved; _runningActivities.clear(); });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_namesStorageKey, _activityNames);
+      await prefs.setString(_storageKey, jsonEncode(_savedActivities.map((a) => a.toJson()).toList()));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('بازیابی انجام شد.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در بازیابی: ' + e.toString())));
+    }
   }
 
   Widget _buildActivitiesPage() {
