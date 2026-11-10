@@ -122,11 +122,15 @@ class _CountdownTimer {
 class _ChecklistItem {
   String title;
   bool done;
-  _ChecklistItem({required this.title, this.done = false});
-  Map<String, dynamic> toJson() => {'title': title, 'done': done};
+  List<Map<String, dynamic>> history;
+  _ChecklistItem({required this.title, this.done = false, List<Map<String, dynamic>>? history})
+      : history = history ?? [];
+  Map<String, dynamic> toJson() => {'title': title, 'done': done, 'history': history};
   factory _ChecklistItem.fromJson(Map<String, dynamic> json) => _ChecklistItem(
     title: json['title'] as String? ?? '',
     done: json['done'] as bool? ?? false,
+    history: (json['history'] as List<dynamic>? ?? [])
+      .map((e) => Map<String, dynamic>.from(e as Map)).toList(),
   );
 }
 
@@ -1085,6 +1089,79 @@ class _MainScreenState extends State<MainScreen> {
       jsonEncode(_checklists.map((e) => e.toJson()).toList()));
   }
 
+  Future<void> _exportChecklistsTxt() async {
+    if (_checklists.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('چک‌لیستی برای خروجی وجود ندارد.')));
+      return;
+    }
+    final buffer = StringBuffer('گزارش چک‌لیست‌ها\n====================\n');
+    for (final list in _checklists) {
+      buffer.writeln('\n\${list.title}');
+      buffer.writeln('------------------------------');
+      for (final item in list.items) {
+        buffer.writeln('[\${item.done ? '✓ انجام‌شده' : '✗ انجام‌نشده'}] \${item.title}');
+        for (final event in item.history) {
+          final at = DateTime.tryParse(event['at']?.toString() ?? '');
+          if (at != null) buffer.writeln('  \${event['done'] == true ? 'انجام شد' : 'انجام‌نشده شد'}: \${_jalaliDate(at)} \${_clockTime(at)}');
+        }
+      }
+    }
+    final dir = await getTemporaryDirectory();
+    final file = File('\${dir.path}/checklists_\${DateTime.now().millisecondsSinceEpoch}.txt');
+    await file.writeAsString(buffer.toString(), encoding: utf8, flush: true);
+    await Share.shareXFiles([XFile(file.path)], text: 'خروجی چک‌لیست‌ها');
+  }
+
+  Future<void> _backupChecklists() async {
+    final content = const JsonEncoder.withIndent('  ').convert({
+      'format': 'timer_main_checklists_backup',
+      'version': 1,
+      'createdAt': DateTime.now().toIso8601String(),
+      'checklists': _checklists.map((e) => e.toJson()).toList(),
+    });
+    final path = await FilePicker.platform.saveFile(
+      dialogTitle: 'ذخیره پشتیبان چک‌لیست‌ها',
+      fileName: 'checklists_backup.json',
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+      bytes: utf8.encode(content),
+    );
+    if (path != null && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('پشتیبان چک‌لیست‌ها ذخیره شد.')));
+  }
+
+  Future<void> _restoreChecklistsBackup() async {
+    final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['json'], withData: true);
+    if (picked == null || picked.files.single.bytes == null || !mounted) return;
+    try {
+      final data = jsonDecode(utf8.decode(picked.files.single.bytes!)) as Map<String, dynamic>;
+      if (data['format'] != 'timer_main_checklists_backup' || data['version'] != 1) throw const FormatException('این فایل، پشتیبان معتبر چک‌لیست‌ها نیست.');
+      final restored = (data['checklists'] as List<dynamic>).map((e) => _Checklist.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+      final confirm = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+        title: const Text('بازیابی پشتیبان چک‌لیست‌ها'),
+        content: const Text('چک‌لیست‌های فعلی با اطلاعات فایل پشتیبان جایگزین می‌شوند. ادامه می‌دهی؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('بازیابی')),
+        ],
+      ));
+      if (confirm != true || !mounted) return;
+      setState(() => _checklists = restored);
+      await _persistChecklists();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('چک‌لیست‌ها با موفقیت بازیابی شدند.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در بازیابی: ' + e.toString())));
+    }
+  }
+
+  void _toggleChecklistItem(_ChecklistItem item, bool done) {
+    final now = DateTime.now();
+    setState(() {
+      item.done = done;
+      item.history.add({'done': done, 'at': now.toIso8601String()});
+    });
+    _persistChecklists();
+  }
+
   Future<String?> _askChecklistText({required String title, String hint = '', String initial = ''}) async {
     final controller = TextEditingController(text: initial);
     final value = await showDialog<String>(context: context, builder: (ctx) => AlertDialog(
@@ -1162,6 +1239,12 @@ class _MainScreenState extends State<MainScreen> {
         FilledButton.icon(onPressed: _addChecklist, icon: const Icon(Icons.add), label: const Text('چک‌لیست جدید'),
           style: FilledButton.styleFrom(backgroundColor: _accentColor)),
       ]),
+      const SizedBox(height: 10),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        OutlinedButton.icon(onPressed: _exportChecklistsTxt, icon: const Icon(Icons.text_snippet_outlined), label: const Text('خروجی TXT')),
+        OutlinedButton.icon(onPressed: _backupChecklists, icon: const Icon(Icons.backup_outlined), label: const Text('پشتیبان چک‌لیست‌ها')),
+        OutlinedButton.icon(onPressed: _restoreChecklistsBackup, icon: const Icon(Icons.restore), label: const Text('بازیابی پشتیبان')),
+      ]),
       const SizedBox(height: 8),
       const Text('برای هر بخش از کارها یک چک‌لیست جدا بساز و موارد انجام‌شده را علامت بزن.',
         style: TextStyle(color: Colors.black54, height: 1.6)),
@@ -1203,14 +1286,16 @@ class _MainScreenState extends State<MainScreen> {
                   contentPadding: EdgeInsets.zero,
                   leading: Checkbox(value: item.done, activeColor: _accentColor,
                     onChanged: (value) async {
-                      setState(() => item.done = value ?? false);
+                      _toggleChecklistItem(item, value ?? false);
                       await _persistChecklists();
                     }),
                   title: Text(item.title,
                     style: TextStyle(decoration: item.done ? TextDecoration.lineThrough : null,
                       color: item.done ? Colors.black45 : null)),
+                  subtitle: item.history.isEmpty ? null : Text(
+                    'آخرین تغییر: ${_jalaliDate(DateTime.parse(item.history.last['at'] as String))} - ${_clockTime(DateTime.parse(item.history.last['at'] as String))}'),
                   onTap: () async {
-                    setState(() => item.done = !item.done);
+                    _toggleChecklistItem(item, !item.done);
                     await _persistChecklists();
                   },
                   trailing: PopupMenuButton<String>(
