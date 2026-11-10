@@ -111,6 +111,35 @@ class _CountdownTimer {
   _CountdownTimer({required this.id, required this.title, required this.totalSeconds}) : remainingSeconds=totalSeconds;
 }
 
+
+class _ChecklistItem {
+  String title;
+  bool done;
+  _ChecklistItem({required this.title, this.done = false});
+  Map<String, dynamic> toJson() => {'title': title, 'done': done};
+  factory _ChecklistItem.fromJson(Map<String, dynamic> json) => _ChecklistItem(
+    title: json['title'] as String? ?? '',
+    done: json['done'] as bool? ?? false,
+  );
+}
+
+class _Checklist {
+  final String id;
+  String title;
+  final List<_ChecklistItem> items;
+  _Checklist({required this.id, required this.title, List<_ChecklistItem>? items})
+      : items = items ?? [];
+  Map<String, dynamic> toJson() => {
+    'id': id, 'title': title, 'items': items.map((e) => e.toJson()).toList(),
+  };
+  factory _Checklist.fromJson(Map<String, dynamic> json) => _Checklist(
+    id: json['id'] as String? ?? DateTime.now().microsecondsSinceEpoch.toString(),
+    title: json['title'] as String? ?? 'چک‌لیست',
+    items: (json['items'] as List<dynamic>? ?? [])
+      .map((e) => _ChecklistItem.fromJson(Map<String, dynamic>.from(e as Map))).toList(),
+  );
+}
+
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -121,7 +150,8 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   static const _storageKey = 'completed_activities_jalali_v1';
   static const _namesStorageKey = 'activity_names_v1';
-  static const _tabTitles = ['ثبت زمان', 'فعالیت‌ها', 'گزارش‌گیری', 'تایمر معکوس'];
+  static const _checklistsStorageKey = 'checklists_v1';
+  static const _tabTitles = ['ثبت زمان', 'فعالیت‌ها', 'گزارش‌گیری', 'تایمر معکوس', 'چک‌لیست‌ها'];
   static const _colors = [
     Color(0xFF356AE6),
     Color(0xFF00897B),
@@ -144,6 +174,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<_RunningActivity> _runningActivities = [];
   List<_SavedActivity> _savedActivities = [];
   List<String> _activityNames = [];
+  List<_Checklist> _checklists = [];
 
   @override
   void initState() {
@@ -152,6 +183,7 @@ class _MainScreenState extends State<MainScreen> {
       if (mounted) setState(() => _now = DateTime.now());
     });
     _initializeData();
+    _loadChecklists();
     _initializeAlarmNotifications();
     _countdownTicker=Timer.periodic(const Duration(seconds:1), (_) => _tickCountdowns());
   }
@@ -408,6 +440,7 @@ class _MainScreenState extends State<MainScreen> {
           _buildActivitiesPage(),
           _buildReportsPage(),
           _buildCountdownPage(),
+          _buildChecklistsPage(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -433,6 +466,11 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.hourglass_bottom_rounded),
             selectedIcon: Icon(Icons.hourglass_full_rounded),
             label: 'تایمر معکوس',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.fact_check_outlined),
+            selectedIcon: Icon(Icons.fact_check_rounded),
+            label: 'چک‌لیست‌ها',
           ),
         ],
       ),
@@ -769,6 +807,7 @@ class _MainScreenState extends State<MainScreen> {
       'version': 1,
       'activityNames': _activityNames,
       'savedActivities': _savedActivities.map((a) => a.toJson()).toList(),
+      'checklists': _checklists.map((a) => a.toJson()).toList(),
     });
     final path = await FilePicker.platform.saveFile(
       dialogTitle: 'ذخیره فایل پشتیبان',
@@ -788,22 +827,194 @@ class _MainScreenState extends State<MainScreen> {
       if (data['format'] != 'timer_main_backup' || data['version'] != 1) throw const FormatException('فایل پشتیبان معتبر نیست.');
       final names = (data['activityNames'] as List<dynamic>).cast<String>().toSet().toList();
       final saved = (data['savedActivities'] as List<dynamic>).map((e) => _SavedActivity.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+      final restoredChecklists = (data['checklists'] as List<dynamic>? ?? []).map((e) => _Checklist.fromJson(Map<String, dynamic>.from(e as Map))).toList();
       final yes = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
         title: const Text('بازیابی اطلاعات'),
         content: const Text('اطلاعات فعلی با فایل پشتیبان جایگزین می‌شود. ادامه می‌دهی؟'),
         actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('بازیابی'))],
       ));
       if (yes != true || !mounted) return;
-      setState(() { _activityNames = names..sort(); _savedActivities = saved; _runningActivities.clear(); });
+      setState(() { _activityNames = names..sort(); _savedActivities = saved; _checklists = restoredChecklists; _runningActivities.clear(); });
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList(_namesStorageKey, _activityNames);
       await prefs.setString(_storageKey, jsonEncode(_savedActivities.map((a) => a.toJson()).toList()));
+      await prefs.setString(_checklistsStorageKey, jsonEncode(_checklists.map((a) => a.toJson()).toList()));
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('بازیابی انجام شد.')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در بازیابی: ' + e.toString())));
     }
   }
 
+
+
+  Future<void> _loadChecklists() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_checklistsStorageKey);
+    if (raw == null) return;
+    try {
+      final data = jsonDecode(raw) as List<dynamic>;
+      if (!mounted) return;
+      setState(() => _checklists = data.map((e) =>
+        _Checklist.fromJson(Map<String, dynamic>.from(e as Map))).toList());
+    } catch (_) {
+      // Ignore invalid local checklist data.
+    }
+  }
+
+  Future<void> _persistChecklists() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_checklistsStorageKey,
+      jsonEncode(_checklists.map((e) => e.toJson()).toList()));
+  }
+
+  Future<String?> _askChecklistText({required String title, String hint = '', String initial = ''}) async {
+    final controller = TextEditingController(text: initial);
+    final value = await showDialog<String>(context: context, builder: (ctx) => AlertDialog(
+      title: Text(title),
+      content: TextField(controller: controller, autofocus: true,
+        textInputAction: TextInputAction.done,
+        decoration: InputDecoration(hintText: hint, border: const OutlineInputBorder()),
+        onSubmitted: (v) => Navigator.pop(ctx, v.trim())),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('ذخیره')),
+      ],
+    ));
+    controller.dispose();
+    if (value == null || value.trim().isEmpty) return null;
+    return value.trim();
+  }
+
+  Future<void> _addChecklist() async {
+    final name = await _askChecklistText(title: 'چک‌لیست جدید', hint: 'مثلاً برنامه روزانه');
+    if (name == null || !mounted) return;
+    setState(() => _checklists.insert(0, _Checklist(
+      id: DateTime.now().microsecondsSinceEpoch.toString(), title: name)));
+    await _persistChecklists();
+  }
+
+  Future<void> _addChecklistItem(_Checklist list) async {
+    final text = await _askChecklistText(title: 'افزودن مورد', hint: 'عنوان مورد چک‌لیست');
+    if (text == null || !mounted) return;
+    setState(() => list.items.add(_ChecklistItem(title: text)));
+    await _persistChecklists();
+  }
+
+  Future<void> _editChecklist(_Checklist list) async {
+    final name = await _askChecklistText(title: 'ویرایش نام چک‌لیست', initial: list.title);
+    if (name == null || !mounted) return;
+    setState(() => list.title = name);
+    await _persistChecklists();
+  }
+
+  Future<void> _editChecklistItem(_Checklist list, _ChecklistItem item) async {
+    final title = await _askChecklistText(title: 'ویرایش مورد', initial: item.title);
+    if (title == null || !mounted) return;
+    setState(() => item.title = title);
+    await _persistChecklists();
+  }
+
+  Future<bool> _confirmChecklistDelete(String title) async {
+    return await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('حذف'),
+      content: Text('«$title» حذف شود؟'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('حذف')),
+      ],
+    )) ?? false;
+  }
+
+  Future<void> _deleteChecklist(_Checklist list) async {
+    if (!await _confirmChecklistDelete(list.title) || !mounted) return;
+    setState(() => _checklists.remove(list));
+    await _persistChecklists();
+  }
+
+  Future<void> _deleteChecklistItem(_Checklist list, _ChecklistItem item) async {
+    if (!await _confirmChecklistDelete(item.title) || !mounted) return;
+    setState(() => list.items.remove(item));
+    await _persistChecklists();
+  }
+
+  Widget _buildChecklistsPage() {
+    return ListView(padding: const EdgeInsets.all(16), children: [
+      Row(children: [
+        const Expanded(child: Text('چک‌لیست‌های من', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold))),
+        FilledButton.icon(onPressed: _addChecklist, icon: const Icon(Icons.add), label: const Text('چک‌لیست جدید'),
+          style: FilledButton.styleFrom(backgroundColor: _accentColor)),
+      ]),
+      const SizedBox(height: 8),
+      const Text('برای هر بخش از کارها یک چک‌لیست جدا بساز و موارد انجام‌شده را علامت بزن.',
+        style: TextStyle(color: Colors.black54, height: 1.6)),
+      const SizedBox(height: 14),
+      if (_checklists.isEmpty)
+        const Padding(padding: EdgeInsets.symmetric(vertical: 36),
+          child: Center(child: Text('هنوز چک‌لیستی نساخته‌ای.')))
+      else
+        ..._checklists.map((list) {
+          final done = list.items.where((e) => e.done).length;
+          final total = list.items.length;
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            color: Colors.white,
+            child: ExpansionTile(
+              key: PageStorageKey<String>(list.id),
+              leading: Icon(Icons.checklist_rounded, color: _accentColor),
+              title: Text(list.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text('انجام‌شده: ${_persianDigits(done.toString())} از ${_persianDigits(total.toString())}'),
+              childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              trailing: PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'edit') _editChecklist(list);
+                  if (value == 'delete') _deleteChecklist(list);
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'edit', child: Text('ویرایش نام')),
+                  PopupMenuItem(value: 'delete', child: Text('حذف چک‌لیست')),
+                ],
+              ),
+              children: [
+                if (total > 0)
+                  Padding(padding: const EdgeInsets.only(bottom: 8),
+                    child: LinearProgressIndicator(value: total == 0 ? 0 : done / total,
+                      color: _accentColor, backgroundColor: const Color(0xFFE9ECF3))),
+                if (list.items.isEmpty)
+                  const Padding(padding: EdgeInsets.all(12), child: Text('هنوز موردی اضافه نشده است.')),
+                ...list.items.map((item) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Checkbox(value: item.done, activeColor: _accentColor,
+                    onChanged: (value) async {
+                      setState(() => item.done = value ?? false);
+                      await _persistChecklists();
+                    }),
+                  title: Text(item.title,
+                    style: TextStyle(decoration: item.done ? TextDecoration.lineThrough : null,
+                      color: item.done ? Colors.black45 : null)),
+                  onTap: () async {
+                    setState(() => item.done = !item.done);
+                    await _persistChecklists();
+                  },
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'edit') _editChecklistItem(list, item);
+                      if (value == 'delete') _deleteChecklistItem(list, item);
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'edit', child: Text('ویرایش')),
+                      PopupMenuItem(value: 'delete', child: Text('حذف')),
+                    ],
+                  ),
+                )),
+                Align(alignment: Alignment.centerRight,
+                  child: TextButton.icon(onPressed: () => _addChecklistItem(list),
+                    icon: const Icon(Icons.add), label: const Text('افزودن مورد'))),
+              ],
+            ),
+          );
+        }),
+    ]);
+  }
 
   Future<void> _initializeAlarmNotifications() async {
     final android=_notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
