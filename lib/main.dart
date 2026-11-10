@@ -1284,6 +1284,70 @@ class _MainScreenState extends State<MainScreen> {
     await Share.shareXFiles([XFile(file.path)], text: 'گزارش زمان فعالیت‌ها');
   }
 
+  Future<void> _showReportActivityPicker() async {
+    final selected = Set<String>.from(_reportSelectedNames);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, refreshDialog) => AlertDialog(
+          title: const Text('انتخاب فعالیت‌ها'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: _activityNames.isEmpty
+                ? const Text('هنوز فعالیتی ثبت نشده است.')
+                : ListView(
+                    shrinkWrap: true,
+                    children: [
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('انتخاب همه فعالیت‌ها'),
+                        value: selected.length == _activityNames.length,
+                        onChanged: (value) => refreshDialog(() {
+                          if (value == true) {
+                            selected.addAll(_activityNames);
+                          } else {
+                            selected.clear();
+                          }
+                        }),
+                      ),
+                      const Divider(height: 1),
+                      ..._activityNames.map((name) => CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(name),
+                        value: selected.contains(name),
+                        onChanged: (value) => refreshDialog(() {
+                          if (value == true) {
+                            selected.add(name);
+                          } else {
+                            selected.remove(name);
+                          }
+                        }),
+                      )),
+                    ],
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('انصراف'),
+            ),
+            FilledButton(
+              onPressed: () {
+                setState(() {
+                  _reportSelectedNames
+                    ..clear()
+                    ..addAll(selected);
+                });
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('اعمال انتخاب'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildReportsPage() {
     final rows = _reportRows();
     final seconds = rows.fold<int>(0, (s, a) => s + a.durationSeconds);
@@ -1305,8 +1369,24 @@ class _MainScreenState extends State<MainScreen> {
         ),
       ]),
       TextButton(onPressed: () => setState(() { _reportStartDate = null; _reportEndDate = null; _reportSelectedNames.clear(); }), child: const Text('پاک کردن فیلترها')),
-      const Text('فعالیت‌ها (بدون انتخاب، همه فعالیت‌ها):'),
-      Wrap(spacing: 8, children: _activityNames.map((n) => FilterChip(label: Text(n), selected: _reportSelectedNames.contains(n), onSelected: (v) => setState(() { if (v) { _reportSelectedNames.add(n); } else { _reportSelectedNames.remove(n); } }))).toList()),
+      OutlinedButton.icon(
+        onPressed: _showReportActivityPicker,
+        icon: const Icon(Icons.tune),
+        label: const Text('انتخاب فعالیت‌ها'),
+      ),
+      if (_reportSelectedNames.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            'فعالیت‌های انتخاب‌شده: ${_persianDigits(_reportSelectedNames.length.toString())}',
+            style: const TextStyle(color: Colors.black54),
+          ),
+        )
+      else
+        const Padding(
+          padding: EdgeInsets.only(top: 4),
+          child: Text('در حال نمایش گزارش همه فعالیت‌ها', style: TextStyle(color: Colors.black54)),
+        ),
       const SizedBox(height: 12),
       Text('تعداد نوبت: ' + _persianDigits(rows.length.toString()) + ' | مجموع: ' + _durationText(Duration(seconds: seconds))),
       const SizedBox(height: 12),
