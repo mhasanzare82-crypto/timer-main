@@ -1507,6 +1507,83 @@ class _MainScreenState extends State<MainScreen> {
     await Share.shareXFiles([XFile(file.path)], text: 'خروجی چک‌لیست‌ها');
   }
 
+  Future<void> _exportChecklistExcel(_Checklist list) async {
+    if (list.items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('این چک‌لیست هنوز موردی ندارد.')),
+      );
+      return;
+    }
+
+    final exportedAt = DateTime.now();
+    final book = Excel.createExcel();
+
+    // وضعیت فعلی همه موارد، شامل موارد تیک‌خورده و تیک‌نخورده.
+    final current = book['وضعیت فعلی'];
+    current.appendRow([
+      TextCellValue('نام چک‌لیست'),
+      TextCellValue('مورد'),
+      TextCellValue('وضعیت'),
+      TextCellValue('تاریخ ثبت وضعیت'),
+      TextCellValue('ساعت ثبت وضعیت'),
+    ]);
+    for (final item in list.items) {
+      current.appendRow([
+        TextCellValue(list.title),
+        TextCellValue(item.title),
+        TextCellValue(item.done ? 'انجام‌شده' : 'انجام‌نشده'),
+        TextCellValue(_jalaliDate(exportedAt)),
+        TextCellValue(_clockTime(exportedAt)),
+      ]);
+    }
+
+    // تمام دفعات تیک‌زدن و برداشتن تیک، با زمان دقیق هر تغییر.
+    final history = book['تاریخچه تغییرات'];
+    history.appendRow([
+      TextCellValue('نام چک‌لیست'),
+      TextCellValue('مورد'),
+      TextCellValue('وضعیت ثبت‌شده'),
+      TextCellValue('تاریخ تغییر'),
+      TextCellValue('ساعت تغییر'),
+    ]);
+    for (final item in list.items) {
+      for (final event in item.history) {
+        final at = DateTime.tryParse(event['at']?.toString() ?? '');
+        if (at == null) continue;
+        final done = event['done'] == true;
+        history.appendRow([
+          TextCellValue(list.title),
+          TextCellValue(item.title),
+          TextCellValue(done ? 'تیک زده شد' : 'تیک برداشته شد'),
+          TextCellValue(_jalaliDate(at)),
+          TextCellValue(_clockTime(at)),
+        ]);
+      }
+    }
+
+    final bytes = book.encode();
+    if (bytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ساخت فایل اکسل ناموفق بود.')),
+      );
+      return;
+    }
+
+    final safeName = list.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    final path = await FilePicker.platform.saveFile(
+      dialogTitle: 'ذخیره گزارش اکسل چک‌لیست',
+      fileName: 'checklist_${safeName}_${exportedAt.millisecondsSinceEpoch}.xlsx',
+      type: FileType.custom,
+      allowedExtensions: ['xlsx'],
+      bytes: bytes,
+    );
+    if (path != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('گزارش اکسل چک‌لیست ذخیره شد.')),
+      );
+    }
+  }
+
   Future<void> _backupChecklists() async {
     final content = const JsonEncoder.withIndent('  ').convert({
       'format': 'timer_main_checklists_backup',
@@ -1660,14 +1737,24 @@ class _MainScreenState extends State<MainScreen> {
               title: Text(list.title, style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Text('انجام‌شده: ${_persianDigits(done.toString())} از ${_persianDigits(total.toString())}'),
               childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              trailing: PopupMenuButton<String>(
-                onSelected: (value) {
-                  if (value == 'edit') _editChecklist(list);
-                  if (value == 'delete') _deleteChecklist(list);
-                },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'edit', child: Text('ویرایش نام')),
-                  PopupMenuItem(value: 'delete', child: Text('حذف چک‌لیست')),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'ذخیره گزارش اکسل این چک‌لیست',
+                    onPressed: () => _exportChecklistExcel(list),
+                    icon: Icon(Icons.file_download_outlined, color: _accentColor),
+                  ),
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'edit') _editChecklist(list);
+                      if (value == 'delete') _deleteChecklist(list);
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'edit', child: Text('ویرایش نام')),
+                      PopupMenuItem(value: 'delete', child: Text('حذف چک‌لیست')),
+                    ],
+                  ),
                 ],
               ),
               children: [
