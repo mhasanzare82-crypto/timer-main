@@ -827,6 +827,31 @@ class _MainScreenState extends State<MainScreen> {
           const SizedBox(height: 14),
           ..._runningActivities.map(_buildRunningActivityCard),
         ],
+        if (_countdowns.isNotEmpty) ...[
+          const SizedBox(height: 22),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'تایمرهای من',
+                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+                ),
+              ),
+              Text(
+                _persianDigits(_countdowns.length.toString()),
+                style: TextStyle(color: _accentColor, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 8),
+              TextButton.icon(
+                onPressed: () => setState(() => _selectedIndex = 3),
+                icon: const Icon(Icons.tune_rounded, size: 18),
+                label: const Text('تنظیم تایمر'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ..._countdowns.map(_buildCountdownCard),
+        ],
       ],
     );
   }
