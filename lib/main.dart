@@ -147,6 +147,92 @@ class _Checklist {
   );
 }
 
+
+class _ActivityDetailPage extends StatelessWidget {
+  final String name;
+  final List<_SavedActivity> sessions;
+  final Color accentColor;
+  final String Function(Duration) formatDuration;
+  final String Function(String) persianDigits;
+
+  const _ActivityDetailPage({
+    required this.name,
+    required this.sessions,
+    required this.accentColor,
+    required this.formatDuration,
+    required this.persianDigits,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final total = sessions.fold<int>(0, (sum, item) => sum + item.durationSeconds);
+    return Scaffold(
+      appBar: AppBar(title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold))),
+      body: sessions.isEmpty
+          ? const Center(child: Text('هنوز سابقه‌ای برای این فعالیت ثبت نشده است.'))
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              children: [
+                Text('سوابق فعالیت', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: accentColor)),
+                const SizedBox(height: 12),
+                ...sessions.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final item = entry.value;
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    color: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.all(15),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text('نوبت ${persianDigits((index + 1).toString())}',
+                            style: TextStyle(fontWeight: FontWeight.bold, color: accentColor)),
+                          const SizedBox(height: 10),
+                          _line('تاریخ شروع', item.startDate),
+                          _line('ساعت شروع', item.startTime),
+                          const Divider(height: 18),
+                          _line('تاریخ پایان', item.endDate),
+                          _line('ساعت پایان', item.endTime),
+                          const Divider(height: 18),
+                          _line('مدت این نوبت', formatDuration(Duration(seconds: item.durationSeconds))),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+                const SizedBox(height: 8),
+                Card(
+                  color: accentColor.withValues(alpha: 0.09),
+                  elevation: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(children: [
+                      const Text('مجموع کل زمان این فعالیت', style: TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 8),
+                      Text(formatDuration(Duration(seconds: total)),
+                        textDirection: TextDirection.ltr,
+                        style: TextStyle(fontSize: 27, fontWeight: FontWeight.bold, color: accentColor)),
+                      const SizedBox(height: 4),
+                      Text('تعداد دفعات: ${persianDigits(sessions.length.toString())}',
+                        style: const TextStyle(color: Colors.black54)),
+                    ]),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _line(String label, String value) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 3),
+    child: Row(children: [
+      SizedBox(width: 95, child: Text(label, style: const TextStyle(color: Colors.black54))),
+      Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w500))),
+    ]),
+  );
+}
+
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -158,6 +244,7 @@ class _MainScreenState extends State<MainScreen> {
   static const _storageKey = 'completed_activities_jalali_v1';
   static const _namesStorageKey = 'activity_names_v1';
   static const _checklistsStorageKey = 'checklists_v1';
+  static const _categoriesStorageKey = 'activity_categories_v1';
   static const _tabTitles = ['ثبت زمان', 'فعالیت‌ها', 'گزارش‌گیری', 'تایمر معکوس', 'چک‌لیست‌ها'];
   static const _colors = [
     Color(0xFF356AE6),
@@ -181,6 +268,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<_RunningActivity> _runningActivities = [];
   List<_SavedActivity> _savedActivities = [];
   List<String> _activityNames = [];
+  Map<String, String> _activityCategories = {};
   List<_Checklist> _checklists = [];
 
   @override
@@ -208,6 +296,7 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _initializeData() async {
     await _loadActivities();
     await _loadActivityNames();
+    await _loadActivityCategories();
   }
 
   Future<void> _loadActivities() async {
@@ -237,6 +326,48 @@ class _MainScreenState extends State<MainScreen> {
     if (!mounted) return;
     setState(() => _activityNames = names.toList()..sort());
     if (names.length != stored.length) await prefs.setStringList(_namesStorageKey, _activityNames);
+  }
+
+  Future<void> _loadActivityCategories() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_categoriesStorageKey);
+    if (raw == null) return;
+    try {
+      final decoded = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      if (!mounted) return;
+      setState(() => _activityCategories = decoded.map((k, v) => MapEntry(k, v.toString())));
+    } catch (_) {}
+  }
+
+  Future<void> _persistActivityCategories() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_categoriesStorageKey, jsonEncode(_activityCategories));
+  }
+
+  Future<void> _setActivityCategory(String name) async {
+    final current = _activityCategories[name] ?? 'بدون دسته‌بندی';
+    final category = await _askChecklistText(
+      title: 'دسته‌بندی فعالیت',
+      hint: 'مثلاً کار، یادگیری، سلامتی',
+      initial: current == 'بدون دسته‌بندی' ? '' : current,
+    );
+    if (category == null || !mounted) return;
+    setState(() => _activityCategories[name] = category);
+    await _persistActivityCategories();
+  }
+
+  Future<void> _openActivityDetails(String name) async {
+    final sessions = _savedActivities.where((a) => a.name == name).toList()
+      ..sort((a, b) => b.startDate.compareTo(a.startDate));
+    await Navigator.push(context, MaterialPageRoute(
+      builder: (_) => _ActivityDetailPage(
+        name: name,
+        sessions: sessions,
+        accentColor: _accentColor,
+        formatDuration: _durationText,
+        persianDigits: _persianDigits,
+      ),
+    ));
   }
 
   Future<void> _persistActivityNames() async {
@@ -1158,6 +1289,12 @@ class _MainScreenState extends State<MainScreen> {
     for (final item in _savedActivities) {
       totalByName[item.name] = (totalByName[item.name] ?? 0) + item.durationSeconds;
     }
+    final grouped = <String, List<String>>{};
+    for (final name in _activityNames) {
+      final category = _activityCategories[name] ?? 'بدون دسته‌بندی';
+      (grouped[category] ??= []).add(name);
+    }
+    final categories = grouped.keys.toList()..sort();
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -1174,7 +1311,7 @@ class _MainScreenState extends State<MainScreen> {
         ),
         const SizedBox(height: 8),
         const Text(
-          'فعالیت‌هایی که اینجا می‌سازی، در بخش ثبت زمان با تایپ نامشان قابل انتخاب هستند.',
+          'برای مشاهده سوابق، روی فعالیت بزن. هر فعالیت را می‌توانی در یک دسته‌بندی قرار بدهی.',
           style: TextStyle(color: Colors.black54, height: 1.6),
         ),
         const SizedBox(height: 14),
@@ -1184,26 +1321,59 @@ class _MainScreenState extends State<MainScreen> {
             child: Center(child: Text('هنوز فعالیتی اضافه نکرده‌ای.')),
           )
         else
-          ..._activityNames.map((name) => Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE8EAF0)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.label_outline_rounded, color: _accentColor),
-                const SizedBox(width: 10),
-                Expanded(child: Text(name, style: const TextStyle(fontWeight: FontWeight.w600))),
-                Text(
-                  _durationText(Duration(seconds: totalByName[name] ?? 0)),
-                  textDirection: TextDirection.ltr,
-                  style: TextStyle(color: _accentColor, fontWeight: FontWeight.bold),
+          ...categories.map((category) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 8),
+                child: Row(children: [
+                  Icon(Icons.folder_outlined, size: 19, color: _accentColor),
+                  const SizedBox(width: 7),
+                  Text(category, style: TextStyle(fontWeight: FontWeight.bold, color: _accentColor)),
+                  const SizedBox(width: 8),
+                  Text(_persianDigits(grouped[category]!.length.toString()),
+                    style: const TextStyle(color: Colors.black45, fontSize: 12)),
+                ]),
+              ),
+              ...grouped[category]!.map((name) => Card(
+                margin: const EdgeInsets.only(bottom: 9),
+                color: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: Color(0xFFE8EAF0)),
                 ),
-              ],
-            ),
+                child: ListTile(
+                  onTap: () => _openActivityDetails(name),
+                  leading: Icon(Icons.label_outline_rounded, color: _accentColor),
+                  title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text('مشاهده تمام دفعات ثبت‌شده'),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(_durationText(Duration(seconds: totalByName[name] ?? 0)),
+                      textDirection: TextDirection.ltr,
+                      style: TextStyle(color: _accentColor, fontWeight: FontWeight.bold)),
+                    PopupMenuButton<String>(
+                      tooltip: 'دسته‌بندی',
+                      onSelected: (value) {
+                        if (value == '__new__') {
+                          _setActivityCategory(name);
+                        } else {
+                          setState(() => _activityCategories[name] = value);
+                          _persistActivityCategories();
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(value: '__new__', child: Text('تعیین دسته‌بندی جدید')),
+                        const PopupMenuDivider(),
+                        ...categories.where((c) => c != category).map((c) =>
+                          PopupMenuItem(value: c, child: Text(c))),
+                        const PopupMenuItem(value: 'بدون دسته‌بندی', child: Text('بدون دسته‌بندی')),
+                      ],
+                    ),
+                  ]),
+                ),
+              )),
+            ],
           )),
       ],
     );
