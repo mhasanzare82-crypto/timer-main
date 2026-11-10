@@ -846,18 +846,18 @@ class _MainScreenState extends State<MainScreen> {
   }
   Future<void> _startCountdown(_CountdownTimer item) async {
     if(item.running||item.remainingSeconds<=0)return;
-    setState(()=>{item.running=true,item.finished=false,item.endsAt=DateTime.now().add(Duration(seconds:item.remainingSeconds))});
+    setState(() { item.running=true; item.finished=false; item.endsAt=DateTime.now().add(Duration(seconds:item.remainingSeconds)); });
     await _scheduleCountdownAlarm(item);
   }
   Future<void> _pauseCountdown(_CountdownTimer item) async {
     if(!item.running)return;
     final remaining=item.endsAt!.difference(DateTime.now()).inSeconds;
     await _notifications.cancel(item.id);
-    setState(()=>{item.remainingSeconds=remaining<0?0:remaining,item.running=false,item.endsAt=null});
+    setState(() { item.remainingSeconds=remaining<0?0:remaining; item.running=false; item.endsAt=null; });
   }
   Future<void> _stopCountdown(_CountdownTimer item) async {
     await _notifications.cancel(item.id);
-    setState(()=>{item.running=false,item.finished=false,item.endsAt=null,item.remainingSeconds=item.totalSeconds});
+    setState(() { item.running=false; item.finished=false; item.endsAt=null; item.remainingSeconds=item.totalSeconds; });
   }
   String _countdownText(int seconds){
     final h=seconds~/3600,m=(seconds%3600)~/60,s=seconds%60;
