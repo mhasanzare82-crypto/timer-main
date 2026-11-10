@@ -241,32 +241,111 @@ class _SavedActivity {
   }
 }
 
+class _PersistentStopwatch {
+  Duration _elapsedBefore = Duration.zero;
+  DateTime? _runningSince;
+
+  _PersistentStopwatch({
+    int elapsedSeconds = 0,
+    DateTime? runningSince,
+    bool startImmediately = true,
+  }) : _elapsedBefore = Duration(seconds: elapsedSeconds),
+       _runningSince = runningSince ?? (startImmediately ? DateTime.now() : null);
+
+  bool get isRunning => _runningSince != null;
+  Duration get elapsed => _elapsedBefore +
+      (_runningSince == null ? Duration.zero : DateTime.now().difference(_runningSince!));
+
+  void start() { _runningSince ??= DateTime.now(); }
+  void stop() {
+    final since = _runningSince;
+    if (since == null) return;
+    _elapsedBefore += DateTime.now().difference(since);
+    _runningSince = null;
+  }
+
+  int get elapsedBeforeSeconds => _elapsedBefore.inSeconds;
+  DateTime? get runningSince => _runningSince;
+}
+
 class _RunningActivity {
   final String id;
   String name;
   final DateTime startedAt;
-  final Stopwatch stopwatch = Stopwatch();
+  final _PersistentStopwatch stopwatch;
   final TextEditingController nameController = TextEditingController();
 
   _RunningActivity({
     required this.id,
     required this.name,
     required this.startedAt,
-  }) {
+    int elapsedSeconds = 0,
+    DateTime? runningSince,
+    bool isRunning = true,
+  }) : stopwatch = _PersistentStopwatch(
+          elapsedSeconds: elapsedSeconds,
+          runningSince: runningSince,
+          startImmediately: isRunning && runningSince == null,
+        ) {
     nameController.text = name;
-    stopwatch.start();
   }
 
-  void dispose() {
-    stopwatch.stop();
-    nameController.dispose();
+  Map<String, dynamic> toJson() => {
+    'id': id, 'name': name,
+    'startedAt': startedAt.millisecondsSinceEpoch,
+    'elapsedSeconds': stopwatch.elapsedBeforeSeconds,
+    'runningSince': stopwatch.runningSince?.millisecondsSinceEpoch,
+    'isRunning': stopwatch.isRunning,
+  };
+
+  factory _RunningActivity.fromJson(Map<String, dynamic> json) {
+    final startedAtMs = json['startedAt'] as int?;
+    final runningSinceMs = json['runningSince'] as int?;
+    return _RunningActivity(
+      id: json['id'] as String? ?? DateTime.now().microsecondsSinceEpoch.toString(),
+      name: json['name'] as String? ?? '',
+      startedAt: startedAtMs == null ? DateTime.now() : DateTime.fromMillisecondsSinceEpoch(startedAtMs),
+      elapsedSeconds: json['elapsedSeconds'] as int? ?? 0,
+      runningSince: runningSinceMs == null ? null : DateTime.fromMillisecondsSinceEpoch(runningSinceMs),
+      isRunning: json['isRunning'] as bool? ?? false,
+    );
   }
+
+  void dispose() { stopwatch.stop(); nameController.dispose(); }
 }
 
 class _CountdownTimer {
-  final int id; final String title; final int totalSeconds;
-  int remainingSeconds; DateTime? endsAt; bool running=false; bool finished=false;
-  _CountdownTimer({required this.id, required this.title, required this.totalSeconds}) : remainingSeconds=totalSeconds;
+  final int id;
+  final String title;
+  final int totalSeconds;
+  int remainingSeconds;
+  DateTime? endsAt;
+  bool running = false;
+  bool finished = false;
+
+  _CountdownTimer({
+    required this.id, required this.title, required this.totalSeconds,
+    int? remainingSeconds, this.endsAt, this.running = false, this.finished = false,
+  }) : remainingSeconds = remainingSeconds ?? totalSeconds;
+
+  Map<String, dynamic> toJson() => {
+    'id': id, 'title': title, 'totalSeconds': totalSeconds,
+    'remainingSeconds': remainingSeconds, 'endsAt': endsAt?.millisecondsSinceEpoch,
+    'running': running, 'finished': finished,
+  };
+
+  factory _CountdownTimer.fromJson(Map<String, dynamic> json) {
+    final endsAtMs = json['endsAt'] as int?;
+    return _CountdownTimer(
+      id: json['id'] as int,
+      title: json['title'] as String? ?? 'تایمر',
+      totalSeconds: json['totalSeconds'] as int,
+      remainingSeconds: json['remainingSeconds'] as int?,
+      endsAt: endsAtMs == null ? null : DateTime.fromMillisecondsSinceEpoch(endsAtMs),
+      running: json['running'] as bool? ?? false,
+      finished: json['finished'] as bool? ?? false,
+    );
+  }
 }
 
 
@@ -400,6 +479,8 @@ class _MainScreenState extends State<MainScreen> {
   static const _namesStorageKey = 'activity_names_v1';
   static const _checklistsStorageKey = 'checklists_v1';
   static const _categoriesStorageKey = 'activity_categories_v1';
+  static const _runningActivitiesStorageKey = 'running_activities_v1';
+  static const _countdownsStorageKey = 'countdown_timers_v1';
   static const _tabTitles = ['ثبت زمان', 'فعالیت‌ها', 'گزارش‌گیری', 'تایمر معکوس', 'چک‌لیست‌ها'];
   static const _colors = [
     Color(0xFF356AE6),
@@ -462,6 +543,28 @@ class _MainScreenState extends State<MainScreen> {
     await _loadActivities();
     await _loadActivityNames();
     await _loadActivityCategories();
+    await _restoreRunningActivities();
+  }
+
+  Future<void> _persistRunningActivities() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_runningActivitiesStorageKey,
+        jsonEncode(_runningActivities.map((item) => item.toJson()).toList()));
+  }
+
+  Future<void> _restoreRunningActivities() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_runningActivitiesStorageKey);
+    if (raw == null || !mounted) return;
+    try {
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      final restored = decoded.map((item) =>
+          _RunningActivity.fromJson(Map<String, dynamic>.from(item as Map))).toList();
+      if (!mounted) { for (final item in restored) { item.dispose(); } return; }
+      setState(() { _runningActivities..clear()..addAll(restored); });
+    } catch (_) {
+      // Ignore a damaged local running-timer cache.
+    }
   }
 
   Future<void> _loadActivities() async {
@@ -696,7 +799,7 @@ class _MainScreenState extends State<MainScreen> {
     await _persistActivityNames();
   }
 
-  void _startNewActivity(String name) {
+  Future<void> _startNewActivity(String name) async {
     if (name.trim().isEmpty) return;
     final activity = _RunningActivity(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -704,15 +807,17 @@ class _MainScreenState extends State<MainScreen> {
       startedAt: _programNow,
     );
     setState(() => _runningActivities.insert(0, activity));
+    await _persistRunningActivities();
   }
 
-  void _createActivityTimer() {
+  Future<void> _createActivityTimer() async {
     final activity = _RunningActivity(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: '',
       startedAt: _programNow,
     );
     setState(() => _runningActivities.insert(0, activity));
+    await _persistRunningActivities();
   }
 
   Future<void> _saveActivityName(_RunningActivity activity) async {
@@ -733,6 +838,7 @@ class _MainScreenState extends State<MainScreen> {
     } else if (mounted) {
       setState(() {});
     }
+    await _persistRunningActivities();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('نام «$name» ذخیره شد؛ تایمر همچنان فعال است.')),
@@ -781,14 +887,16 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  void _startActivity(_RunningActivity activity) {
+  Future<void> _startActivity(_RunningActivity activity) async {
     if (activity.stopwatch.isRunning) return;
     setState(() => activity.stopwatch.start());
+    await _persistRunningActivities();
   }
 
-  void _pauseActivity(_RunningActivity activity) {
+  Future<void> _pauseActivity(_RunningActivity activity) async {
     if (!activity.stopwatch.isRunning) return;
     setState(() => activity.stopwatch.stop());
+    await _persistRunningActivities();
   }
 
   Future<void> _stopActivity(_RunningActivity activity) async {
@@ -808,6 +916,7 @@ class _MainScreenState extends State<MainScreen> {
       _savedActivities.insert(0, saved);
     });
     activity.dispose();
+    await _persistRunningActivities();
     await _persistActivities();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -2034,12 +2143,62 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _initializeAlarmNotifications() async {
-    final android=_notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final android = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await android?.requestNotificationsPermission();
     await android?.requestExactAlarmsPermission();
-    const channel=AndroidNotificationChannel('countdown_alarm_channel','هشدار پایان تایمر',
-      description:'هشدار صوتی هنگام پایان تایمر معکوس',importance:Importance.max,playSound:true,enableVibration:true);
+    const channel = AndroidNotificationChannel(
+      'countdown_alarm_channel', 'هشدار پایان تایمر',
+      description: 'هشدار صوتی هنگام پایان تایمر معکوس',
+      importance: Importance.max, playSound: true, enableVibration: true,
+    );
     await android?.createNotificationChannel(channel);
+    await _restoreCountdowns();
+  }
+
+  Future<void> _persistCountdowns() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_countdownsStorageKey,
+        jsonEncode(_countdowns.map((item) => item.toJson()).toList()));
+  }
+
+  Future<void> _restoreCountdowns() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_countdownsStorageKey);
+    if (raw == null) return;
+    try {
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      final restored = decoded.map((item) =>
+          _CountdownTimer.fromJson(Map<String, dynamic>.from(item as Map))).toList();
+      final now = DateTime.now();
+      final expired = <_CountdownTimer>[];
+      for (final item in restored) {
+        if (item.running && item.endsAt != null) {
+          final left = item.endsAt!.difference(now).inSeconds;
+          if (left <= 0) {
+            item.remainingSeconds = 0;
+            item.running = false;
+            item.finished = true;
+            item.endsAt = null;
+            expired.add(item);
+          } else {
+            item.remainingSeconds = left;
+          }
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _countdowns..clear()..addAll(restored);
+        _nextCountdownId = _countdowns.isEmpty ? 1000 :
+            _countdowns.map((item) => item.id).reduce((a, b) => a > b ? a : b) + 1;
+      });
+      for (final item in restored.where((item) => item.running)) {
+        await _scheduleCountdownAlarm(item);
+      }
+      for (final item in expired) { await _finishCountdown(item); }
+      await _persistCountdowns();
+    } catch (_) {
+      // Ignore damaged timer data without blocking startup.
+    }
   }
   Future<void> _loadCountdownAlarmSettings() async {
     final prefs = await SharedPreferences.getInstance();
@@ -2078,14 +2237,16 @@ class _MainScreenState extends State<MainScreen> {
   }
   void _tickCountdowns(){
     var changed=false;
+    var completed=false;
     for(final item in _countdowns){
       if(!item.running||item.endsAt==null)continue;
       final left=item.endsAt!.difference(DateTime.now()).inSeconds;
       final next=left<=0?0:left;
       if(next!=item.remainingSeconds){item.remainingSeconds=next;changed=true;}
-      if(next<=0){item.running=false;item.finished=true;item.endsAt=null;_finishCountdown(item);changed=true;}
+      if(next<=0){item.running=false;item.finished=true;item.endsAt=null;_finishCountdown(item);changed=true;completed=true;}
     }
     if(changed&&mounted)setState((){});
+    if (completed) _persistCountdowns();
   }
   Future<void> _finishCountdown(_CountdownTimer item) async {
     await _notifications.cancel(item.id);
@@ -2094,14 +2255,24 @@ class _MainScreenState extends State<MainScreen> {
       if (_countdownAlarmSound) SystemSound.play(SystemSoundType.alert);
     }
   }
-  void _addCountdown(){
-    final seconds=_wheelHours*3600+_wheelMinutes*60+_wheelSeconds;
-    if(seconds<=0){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('ابتدا یک زمان بیشتر از صفر انتخاب کن.')));return;}
-    setState(()=>_countdowns.add(_CountdownTimer(id:_nextCountdownId++,title:'تایمر '+(_countdowns.length+1).toString(),totalSeconds:seconds)));
+  Future<void> _addCountdown() async {
+    final seconds = _wheelHours * 3600 + _wheelMinutes * 60 + _wheelSeconds;
+    if (seconds <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ابتدا یک زمان بیشتر از صفر انتخاب کن.')),
+      );
+      return;
+    }
+    setState(() => _countdowns.add(_CountdownTimer(
+      id: _nextCountdownId++, title: 'تایمر ' + (_countdowns.length + 1).toString(),
+      totalSeconds: seconds,
+    )));
+    await _persistCountdowns();
   }
   Future<void> _startCountdown(_CountdownTimer item) async {
     if(item.running||item.remainingSeconds<=0)return;
     setState(() { item.running=true; item.finished=false; item.endsAt=DateTime.now().add(Duration(seconds:item.remainingSeconds)); });
+    await _persistCountdowns();
     await _scheduleCountdownAlarm(item);
   }
   Future<void> _pauseCountdown(_CountdownTimer item) async {
@@ -2109,10 +2280,12 @@ class _MainScreenState extends State<MainScreen> {
     final remaining=item.endsAt!.difference(DateTime.now()).inSeconds;
     await _notifications.cancel(item.id);
     setState(() { item.remainingSeconds=remaining<0?0:remaining; item.running=false; item.endsAt=null; });
+    await _persistCountdowns();
   }
   Future<void> _stopCountdown(_CountdownTimer item) async {
     await _notifications.cancel(item.id);
     setState(() { item.running=false; item.finished=false; item.endsAt=null; item.remainingSeconds=item.totalSeconds; });
+    await _persistCountdowns();
   }
   String _countdownText(int seconds){
     final h=seconds~/3600,m=(seconds%3600)~/60,s=seconds%60;
@@ -2215,7 +2388,7 @@ class _MainScreenState extends State<MainScreen> {
       decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(20),border:Border.all(color:const Color(0xFFE8EAF0))),
       child:Column(children:[
         Row(children:[Expanded(child:Text(item.title,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:16))),
-          IconButton(tooltip:'حذف تایمر',onPressed:()async{await _notifications.cancel(item.id);if(mounted)setState(()=>_countdowns.remove(item));},
+          IconButton(tooltip:'حذف تایمر',onPressed:()async{await _notifications.cancel(item.id);if(mounted){setState(()=>_countdowns.remove(item));await _persistCountdowns();}},
             icon:const Icon(Icons.delete_outline,color:Colors.redAccent))]),
         const SizedBox(height:8),
         SizedBox(width:174,height:174,child:Stack(alignment:Alignment.center,children:[
