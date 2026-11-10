@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:excel/excel.dart';
+import 'package:excel/excel.dart' hide Border;
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -782,9 +782,19 @@ class _MainScreenState extends State<MainScreen> {
     return ListView(padding: const EdgeInsets.all(16), children: [
       const Text('فیلتر گزارش', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
       Row(children: [
-        Expanded(child: OutlinedButton(onPressed: () => _pickReportDate(true), child: Text('از: ' + (_reportStartDate == null ? 'همه' : _jalaliDate(_reportStartDate!)))),
+        Expanded(
+          child: OutlinedButton(
+            onPressed: () => _pickReportDate(true),
+            child: Text('از: ' + (_reportStartDate == null ? 'همه' : _jalaliDate(_reportStartDate!))),
+          ),
+        ),
         const SizedBox(width: 8),
-        Expanded(child: OutlinedButton(onPressed: () => _pickReportDate(false), child: Text('تا: ' + (_reportEndDate == null ? 'همه' : _jalaliDate(_reportEndDate!)))),
+        Expanded(
+          child: OutlinedButton(
+            onPressed: () => _pickReportDate(false),
+            child: Text('تا: ' + (_reportEndDate == null ? 'همه' : _jalaliDate(_reportEndDate!))),
+          ),
+        ),
       ]),
       TextButton(onPressed: () => setState(() { _reportStartDate = null; _reportEndDate = null; _reportSelectedNames.clear(); }), child: const Text('پاک کردن فیلترها')),
       const Text('فعالیت‌ها (بدون انتخاب، همه فعالیت‌ها):'),
