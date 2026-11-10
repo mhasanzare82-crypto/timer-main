@@ -799,7 +799,14 @@ class _MainScreenState extends State<MainScreen> {
           _buildChecklistsPage(),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_selectedIndex == 0 && _runningActivities.isNotEmpty)
+              _buildActivityControlDock(_runningActivities.first),
+          NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) => setState(() => _selectedIndex = index),
         destinations: const [
@@ -829,6 +836,9 @@ class _MainScreenState extends State<MainScreen> {
             label: 'چک‌لیست‌ها',
           ),
         ],
+      ),
+          ],
+        ),
       ),
     );
   }
@@ -922,8 +932,11 @@ class _MainScreenState extends State<MainScreen> {
     final displayName = activity.name.trim().isEmpty
         ? 'فعالیت بدون نام'
         : activity.name.trim();
+    final isDockedActivity = _runningActivities.isNotEmpty &&
+        identical(activity, _runningActivities.first);
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 2),
+      margin: const EdgeInsets.only(bottom: 10),
       elevation: 0,
       color: Colors.white,
       shape: RoundedRectangleBorder(
@@ -931,134 +944,179 @@ class _MainScreenState extends State<MainScreen> {
         side: const BorderSide(color: Color(0xFFE8EAF0)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(13),
+        padding: const EdgeInsets.all(14),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Center(
-              child: SizedBox(
-                width: 250,
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 116,
-                      child: Text(
-                        compactCounter,
-                        textAlign: TextAlign.center,
-                        textDirection: TextDirection.ltr,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 19,
-                          fontFeatures: [FontFeature.tabularFigures()],
-                          letterSpacing: 1,
-                        ),
-                      ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF252A34),
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(width: 10),
-                    SizedBox(
-                      width: 124,
-                      child: Text(
-                        displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
+                Text(
+                  compactCounter,
+                  textDirection: TextDirection.ltr,
+                  style: TextStyle(
+                    color: _accentColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 19,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+            if (!isDockedActivity) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: activity.nameController,
+                      textInputAction: TextInputAction.done,
+                      decoration: InputDecoration(
+                        hintText: 'نام فعالیت',
+                        isDense: true,
+                        filled: true,
+                        fillColor: const Color(0xFFF7F8FC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onChanged: (value) {
+                        activity.name = value;
+                        if (mounted) setState(() {});
+                      },
+                      onSubmitted: (_) => _saveActivityName(activity),
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  IconButton.filled(
+                    tooltip: 'ذخیره نام فعالیت',
+                    onPressed: () => _saveActivityName(activity),
+                    icon: const Icon(Icons.save_outlined, size: 19),
+                    style: IconButton.styleFrom(
+                      backgroundColor: _accentColor,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: activity.nameController,
-                    textInputAction: TextInputAction.done,
-                    style: const TextStyle(fontSize: 13),
-                    decoration: InputDecoration(
-                      hintText: 'نام فعالیت',
-                      isDense: true,
-                      filled: true,
-                      fillColor: const Color(0xFFF7F8FC),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
+              const SizedBox(height: 9),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: isRunning ? null : () => _startActivity(activity),
+                      icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                      label: const Text('شروع'),
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      onPressed: isRunning ? () => _pauseActivity(activity) : null,
+                      icon: const Icon(Icons.pause_rounded, size: 18),
+                      label: const Text('مکث'),
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _stopActivity(activity),
+                      icon: const Icon(Icons.stop_rounded, size: 18),
+                      label: const Text('توقف'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFFFE8E8),
+                        foregroundColor: const Color(0xFFC62828),
                       ),
                     ),
-                    onChanged: (value) {
-                      activity.name = value;
-                      if (mounted) setState(() {});
-                    },
-                    onSubmitted: (_) => _saveActivityName(activity),
                   ),
-                ),
-                const SizedBox(width: 7),
-                IconButton.filled(
-                  tooltip: 'ذخیره نام فعالیت',
-                  onPressed: () => _saveActivityName(activity),
-                  icon: const Icon(Icons.save_outlined, size: 19),
-                  style: IconButton.styleFrom(
-                    backgroundColor: _accentColor,
-                    foregroundColor: Colors.white,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 9),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: isRunning ? null : () => _startActivity(activity),
-                    icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                    label: const Text('شروع'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _accentColor,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 7),
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: isRunning ? () => _pauseActivity(activity) : null,
-                    icon: const Icon(Icons.pause_rounded, size: 18),
-                    label: const Text('مکث'),
-                    style: FilledButton.styleFrom(
-                      foregroundColor: _accentColor,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 7),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () => _stopActivity(activity),
-                    icon: const Icon(Icons.stop_rounded, size: 18),
-                    label: const Text('توقف'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFFFE8E8),
-                      foregroundColor: const Color(0xFFC62828),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildActivityControlDock(_RunningActivity activity) {
+    final isRunning = activity.stopwatch.isRunning;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFFE4E7ED)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x12000000), blurRadius: 12, offset: Offset(0, -2)),
+        ],
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'صفحه ثبت زمان',
+            onPressed: () => setState(() => _selectedIndex = 0),
+            icon: const Icon(Icons.home_rounded),
+            color: _accentColor,
+          ),
+          Expanded(
+            child: TextField(
+              controller: activity.nameController,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                hintText: 'نام فعالیت',
+                isDense: true,
+                filled: true,
+                fillColor: const Color(0xFFF7F8FC),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(22),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              onChanged: (value) {
+                activity.name = value;
+                if (mounted) setState(() {});
+              },
+              onSubmitted: (_) => _saveActivityName(activity),
+            ),
+          ),
+          IconButton(
+            tooltip: 'ذخیره نام فعالیت',
+            onPressed: () => _saveActivityName(activity),
+            icon: const Icon(Icons.save_outlined),
+            color: _accentColor,
+          ),
+          IconButton.filled(
+            tooltip: isRunning ? 'مکث' : 'ادامه',
+            onPressed: isRunning
+                ? () => _pauseActivity(activity)
+                : () => _startActivity(activity),
+            icon: Icon(isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded),
+            style: IconButton.styleFrom(
+              backgroundColor: _accentColor,
+              foregroundColor: Colors.white,
+            ),
+          ),
+          IconButton(
+            tooltip: 'توقف و ثبت فعالیت',
+            onPressed: () => _stopActivity(activity),
+            icon: const Icon(Icons.stop_circle_outlined),
+            color: const Color(0xFFC62828),
+          ),
+        ],
       ),
     );
   }
