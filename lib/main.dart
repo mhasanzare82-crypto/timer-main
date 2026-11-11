@@ -2143,19 +2143,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildChecklistsPage() {
     return ListView(padding: const EdgeInsets.all(16), children: [
-      Row(children: [
-        const Expanded(child: Text('چک‌لیست‌های من', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold))),
-        FilledButton.icon(onPressed: _addChecklist, icon: const Icon(Icons.add), label: const Text('چک‌لیست جدید'),
-          style: FilledButton.styleFrom(backgroundColor: _accentColor)),
-      ]),
-      const SizedBox(height: 10),
-      Wrap(spacing: 8, runSpacing: 8, children: [
-        OutlinedButton.icon(onPressed: _exportChecklistsTxt, icon: const Icon(Icons.text_snippet_outlined), label: const Text('خروجی TXT')),
-        OutlinedButton.icon(onPressed: _createChecklistFromMultilineText, icon: const Icon(Icons.edit_note), label: const Text('ورود سریع با متن')),
-        OutlinedButton.icon(onPressed: _importChecklistTxt, icon: const Icon(Icons.upload_file), label: const Text('ورود از فایل TXT')),
-        OutlinedButton.icon(onPressed: _backupChecklists, icon: const Icon(Icons.backup_outlined), label: const Text('پشتیبان چک‌لیست‌ها')),
-        OutlinedButton.icon(onPressed: _restoreChecklistsBackup, icon: const Icon(Icons.restore), label: const Text('بازیابی پشتیبان')),
-      ]),
+      const Text('چک‌لیست‌های من', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
       const SizedBox(height: 8),
       const Text('برای هر بخش از کارها یک چک‌لیست جدا بساز و موارد انجام‌شده را علامت بزن.',
         style: TextStyle(color: Colors.black54, height: 1.6)),
