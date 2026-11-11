@@ -388,8 +388,8 @@ class _ActivityDetailPage extends StatefulWidget {
   final Color accentColor;
   final String Function(Duration) formatDuration;
   final String Function(String) persianDigits;
-  final Future<void> Function(_SavedActivity) onEdit;
-  final Future<void> Function(_SavedActivity) onDelete;
+  final Future<_SavedActivity?> Function(_SavedActivity) onEdit;
+  final Future<bool> Function(_SavedActivity) onDelete;
 
   const _ActivityDetailPage({
     required this.name, required this.sessions, required this.accentColor,
@@ -428,9 +428,17 @@ class _ActivityDetailPageState extends State<_ActivityDetailPage> {
                     PopupMenuButton<String>(
                       tooltip: 'مدیریت سابقه',
                       onSelected: (value) async {
-                        if (value == 'edit') { await widget.onEdit(item); }
-                        if (value == 'delete') { await widget.onDelete(item); }
-                        if (mounted) setState(() {});
+                        if (value == 'edit') {
+                          final edited = await widget.onEdit(item);
+                          if (edited != null && mounted) setState(() {
+                            final i = widget.sessions.indexOf(item);
+                            if (i >= 0) widget.sessions[i] = edited;
+                          });
+                        }
+                        if (value == 'delete') {
+                          final deleted = await widget.onDelete(item);
+                          if (deleted && mounted) setState(() => widget.sessions.remove(item));
+                        }
                       },
                       itemBuilder: (_) => const [
                         PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined), SizedBox(width: 8), Text('ویرایش')])),
@@ -772,9 +780,9 @@ class _MainScreenState extends State<MainScreen> {
     ));
   }
 
-  Future<void> _editSavedActivity(_SavedActivity activity) async {
+  Future<_SavedActivity?> _editSavedActivity(_SavedActivity activity) async {
     final index = _savedActivities.indexOf(activity);
-    if (index < 0) return;
+    if (index < 0) return null;
     final hours = TextEditingController(text: (activity.durationSeconds ~/ 3600).toString());
     final minutes = TextEditingController(text: ((activity.durationSeconds % 3600) ~/ 60).toString());
     final seconds = TextEditingController(text: (activity.durationSeconds % 60).toString());
@@ -825,12 +833,13 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
     for (final c in [hours, minutes, seconds, startDate, startTime, endDate, endTime]) { c.dispose(); }
-    if (result == null || !mounted) return;
+    if (result == null || !mounted) return null;
     setState(() => _savedActivities[index] = result);
     await _persistActivities();
+    return result;
   }
 
-  Future<void> _deleteSavedActivity(_SavedActivity activity) async {
+  Future<bool> _deleteSavedActivity(_SavedActivity activity) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -843,9 +852,10 @@ class _MainScreenState extends State<MainScreen> {
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !mounted) return false;
     setState(() => _savedActivities.remove(activity));
     await _persistActivities();
+    return true;
   }
 
   Future<void> _persistActivityNames() async {
