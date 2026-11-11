@@ -423,13 +423,35 @@ class _ActivityDetailPage extends StatelessWidget {
                           Text('نوبت ${persianDigits((index + 1).toString())}',
                             style: TextStyle(fontWeight: FontWeight.bold, color: accentColor)),
                           const SizedBox(height: 10),
-                          _line('تاریخ شروع', item.startDate),
-                          _line('ساعت شروع', item.startTime),
-                          const Divider(height: 18),
-                          _line('تاریخ پایان', item.endDate),
-                          _line('ساعت پایان', item.endTime),
-                          const Divider(height: 18),
-                          _line('مدت این نوبت', formatDuration(Duration(seconds: item.durationSeconds))),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF7F8FC),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              reverse: true,
+                              child: Text.rich(
+                                TextSpan(
+                                  style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                  children: [
+                                    const TextSpan(text: 'شروع: ', style: TextStyle(color: Colors.black54)),
+                                    TextSpan(text: '${item.startDate} - ${item.startTime}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                                    const TextSpan(text: '   |   پایان: ', style: TextStyle(color: Colors.black54)),
+                                    TextSpan(text: '${item.endDate} - ${item.endTime}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                                    const TextSpan(text: '   |   مدت: ', style: TextStyle(color: Colors.black54)),
+                                    TextSpan(
+                                      text: formatDuration(Duration(seconds: item.durationSeconds)),
+                                      style: TextStyle(fontWeight: FontWeight.bold, color: accentColor),
+                                    ),
+                                  ],
+                                ),
+                                maxLines: 1,
+                                softWrap: false,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
