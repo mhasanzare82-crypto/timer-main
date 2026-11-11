@@ -898,6 +898,33 @@ class _MainScreenState extends State<MainScreen> {
     await _persistRunningActivities();
   }
 
+  Future<void> _deleteRunningActivity(_RunningActivity activity) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('حذف فعالیت'),
+        content: Text('فعالیت «${activity.nameController.text.trim().isEmpty ? 'بدون نام' : activity.nameController.text.trim()}» حذف شود؟ زمان آن ذخیره نخواهد شد.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('انصراف'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() {
+      _runningActivities.removeWhere((item) => item.id == activity.id);
+    });
+    activity.dispose();
+    await _persistRunningActivities();
+  }
+
   Future<void> _stopActivity(_RunningActivity activity) async {
     activity.stopwatch.stop();
     final endedAt = _programNow;
@@ -1196,7 +1223,7 @@ class _MainScreenState extends State<MainScreen> {
         side: const BorderSide(color: Color(0xFFE8EAF0)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
         child: Row(
           children: [
             Expanded(
@@ -1222,7 +1249,25 @@ class _MainScreenState extends State<MainScreen> {
                 onSubmitted: (_) => _saveActivityName(activity),
               ),
             ),
-            const SizedBox(width: 3),
+            IconButton(
+              tooltip: 'ذخیره نام فعالیت',
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(width: 30, height: 36),
+              padding: EdgeInsets.zero,
+              onPressed: () => _saveActivityName(activity),
+              icon: const Icon(Icons.save_outlined, size: 18),
+              color: _accentColor,
+            ),
+            IconButton(
+              tooltip: 'حذف فعالیت',
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(width: 30, height: 36),
+              padding: EdgeInsets.zero,
+              onPressed: () => _deleteRunningActivity(activity),
+              icon: const Icon(Icons.delete_outline_rounded, size: 18),
+              color: Colors.redAccent,
+            ),
+            const SizedBox(width: 2),
             Expanded(
               flex: 3,
               child: Text(
@@ -1240,28 +1285,28 @@ class _MainScreenState extends State<MainScreen> {
             IconButton(
               tooltip: 'شروع',
               visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+              constraints: const BoxConstraints.tightFor(width: 38, height: 40),
               padding: EdgeInsets.zero,
               onPressed: isRunning ? null : () => _startActivity(activity),
-              icon: const Icon(Icons.play_arrow_rounded, size: 26),
+              icon: const Icon(Icons.play_arrow_rounded, size: 25),
               color: Colors.green,
             ),
             IconButton(
               tooltip: 'مکث',
               visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+              constraints: const BoxConstraints.tightFor(width: 38, height: 40),
               padding: EdgeInsets.zero,
               onPressed: isRunning ? () => _pauseActivity(activity) : null,
-              icon: const Icon(Icons.pause_rounded, size: 26),
+              icon: const Icon(Icons.pause_rounded, size: 25),
               color: Colors.orange,
             ),
             IconButton(
               tooltip: 'توقف و ثبت',
               visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+              constraints: const BoxConstraints.tightFor(width: 38, height: 40),
               padding: EdgeInsets.zero,
               onPressed: () => _stopActivity(activity),
-              icon: const Icon(Icons.stop_rounded, size: 26),
+              icon: const Icon(Icons.stop_rounded, size: 25),
               color: Colors.redAccent,
             ),
           ],
