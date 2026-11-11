@@ -790,6 +790,96 @@ class _MainScreenState extends State<MainScreen> {
     await prefs.setStringList(_namesStorageKey, _activityNames);
   }
 
+  Future<void> _addManualActivityTime(String name) async {
+    final hoursController = TextEditingController();
+    final minutesController = TextEditingController();
+    final secondsController = TextEditingController();
+
+    final durationSeconds = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('ثبت زمان دستی برای «$name»'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('مدت زمانی را که برای این فعالیت صرف کرده‌ای وارد کن.'),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: TextField(
+                  controller: hoursController,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  decoration: const InputDecoration(labelText: 'ساعت', border: OutlineInputBorder()),
+                )),
+                const SizedBox(width: 8),
+                Expanded(child: TextField(
+                  controller: minutesController,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  decoration: const InputDecoration(labelText: 'دقیقه', border: OutlineInputBorder()),
+                )),
+                const SizedBox(width: 8),
+                Expanded(child: TextField(
+                  controller: secondsController,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  decoration: const InputDecoration(labelText: 'ثانیه', border: OutlineInputBorder()),
+                )),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final hours = int.tryParse(hoursController.text.trim()) ?? 0;
+              final minutes = int.tryParse(minutesController.text.trim()) ?? 0;
+              final seconds = int.tryParse(secondsController.text.trim()) ?? 0;
+              if (hours < 0 || minutes < 0 || seconds < 0 ||
+                  (hours == 0 && minutes == 0 && seconds == 0)) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(content: Text('مدت زمان معتبر و بیشتر از صفر وارد کن.')),
+                );
+                return;
+              }
+              Navigator.pop(dialogContext, hours * 3600 + minutes * 60 + seconds);
+            },
+            child: const Text('ثبت زمان'),
+          ),
+        ],
+      ),
+    );
+
+    hoursController.dispose();
+    minutesController.dispose();
+    secondsController.dispose();
+    if (durationSeconds == null || !mounted) return;
+
+    final endedAt = _programNow;
+    final startedAt = endedAt.subtract(Duration(seconds: durationSeconds));
+    setState(() {
+      _savedActivities.insert(0, _SavedActivity(
+        name: name,
+        startDate: _jalaliDate(startedAt),
+        startTime: _clockTime(startedAt),
+        endDate: _jalaliDate(endedAt),
+        endTime: _clockTime(endedAt),
+        durationSeconds: durationSeconds,
+      ));
+    });
+    await _persistActivities();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('زمان دستی فعالیت «$name» ثبت شد.')),
+    );
+  }
+
   Future<void> _addActivityToCatalog() async {
     final controller = TextEditingController();
     final name = await showDialog<String>(
@@ -2744,7 +2834,9 @@ class _MainScreenState extends State<MainScreen> {
                     PopupMenuButton<String>(
                       tooltip: 'مدیریت فعالیت',
                       onSelected: (value) {
-                        if (value == '__edit_activity__') {
+                        if (value == '__manual_time__') {
+                          _addManualActivityTime(name);
+                        } else if (value == '__edit_activity__') {
                           _editActivityName(name);
                         } else if (value == '__delete_activity__') {
                           _deleteActivity(name);
@@ -2756,6 +2848,7 @@ class _MainScreenState extends State<MainScreen> {
                         }
                       },
                       itemBuilder: (_) => [
+                        const PopupMenuItem(value: '__manual_time__', child: Text('ثبت زمان دستی')),
                         const PopupMenuItem(value: '__edit_activity__', child: Text('ویرایش نام فعالیت')),
                         const PopupMenuItem(value: '__delete_activity__', child: Text('حذف فعالیت', style: TextStyle(color: Colors.red))),
                         const PopupMenuDivider(),
