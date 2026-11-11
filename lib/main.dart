@@ -1196,72 +1196,72 @@ class _MainScreenState extends State<MainScreen> {
         side: const BorderSide(color: Color(0xFFE8EAF0)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
         child: Row(
           children: [
             Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: activity.nameController,
-                    textInputAction: TextInputAction.done,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF252A34),
-                      fontWeight: FontWeight.w600,
-                    ),
-                    decoration: const InputDecoration(
-                      hintText: 'نام فعالیت',
-                      isDense: true,
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(vertical: 2),
-                    ),
-                    onChanged: (value) {
-                      activity.name = value;
-                    },
-                    onSubmitted: (_) => _saveActivityName(activity),
-                  ),
-                  Text(
-                    compactCounter,
-                    textDirection: TextDirection.ltr,
-                    style: TextStyle(
-                      color: _accentColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 11,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ],
+              flex: 5,
+              child: TextField(
+                controller: activity.nameController,
+                textInputAction: TextInputAction.done,
+                maxLines: 1,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF252A34),
+                  fontWeight: FontWeight.w600,
+                ),
+                decoration: const InputDecoration(
+                  hintText: 'نام فعالیت',
+                  isDense: true,
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 8),
+                ),
+                onChanged: (value) {
+                  activity.name = value;
+                },
+                onSubmitted: (_) => _saveActivityName(activity),
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 3),
+            Expanded(
+              flex: 3,
+              child: Text(
+                compactCounter,
+                textAlign: TextAlign.center,
+                textDirection: TextDirection.ltr,
+                style: TextStyle(
+                  color: _accentColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
             IconButton(
               tooltip: 'شروع',
               visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+              constraints: const BoxConstraints.tightFor(width: 40, height: 40),
               padding: EdgeInsets.zero,
               onPressed: isRunning ? null : () => _startActivity(activity),
-              icon: const Icon(Icons.play_arrow_rounded, size: 21),
+              icon: const Icon(Icons.play_arrow_rounded, size: 26),
               color: Colors.green,
             ),
             IconButton(
               tooltip: 'مکث',
               visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+              constraints: const BoxConstraints.tightFor(width: 40, height: 40),
               padding: EdgeInsets.zero,
               onPressed: isRunning ? () => _pauseActivity(activity) : null,
-              icon: const Icon(Icons.pause_rounded, size: 21),
+              icon: const Icon(Icons.pause_rounded, size: 26),
               color: Colors.orange,
             ),
             IconButton(
               tooltip: 'توقف و ثبت',
               visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+              constraints: const BoxConstraints.tightFor(width: 40, height: 40),
               padding: EdgeInsets.zero,
               onPressed: () => _stopActivity(activity),
-              icon: const Icon(Icons.stop_rounded, size: 21),
+              icon: const Icon(Icons.stop_rounded, size: 26),
               color: Colors.redAccent,
             ),
           ],
