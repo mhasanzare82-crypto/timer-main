@@ -1063,9 +1063,7 @@ class _MainScreenState extends State<MainScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (_selectedIndex == 0 && _runningActivities.isNotEmpty)
-              _buildActivityControlDock(_runningActivities.first),
-          NavigationBar(
+            NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) => setState(() => _selectedIndex = index),
         destinations: const [
@@ -1188,121 +1186,84 @@ class _MainScreenState extends State<MainScreen> {
     final compactCounter = _persianDigits(
       '${_twoDigits(elapsed.inHours)}:${_twoDigits(elapsed.inMinutes.remainder(60))}:${_twoDigits(elapsed.inSeconds.remainder(60))}',
     );
-    final displayName = activity.name.trim().isEmpty
-        ? 'فعالیت بدون نام'
-        : activity.name.trim();
-    final isDockedActivity = _runningActivities.isNotEmpty &&
-        identical(activity, _runningActivities.first);
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 6),
       elevation: 0,
       color: Colors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(12),
         side: const BorderSide(color: Color(0xFFE8EAF0)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        child: Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    displayName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: activity.nameController,
+                    textInputAction: TextInputAction.done,
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       color: Color(0xFF252A34),
                       fontWeight: FontWeight.w600,
                     ),
+                    decoration: const InputDecoration(
+                      hintText: 'نام فعالیت',
+                      isDense: true,
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(vertical: 2),
+                    ),
+                    onChanged: (value) {
+                      activity.name = value;
+                    },
+                    onSubmitted: (_) => _saveActivityName(activity),
                   ),
-                ),
-                Text(
-                  compactCounter,
-                  textDirection: TextDirection.ltr,
-                  style: TextStyle(
-                    color: _accentColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 19,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+                  Text(
+                    compactCounter,
+                    textDirection: TextDirection.ltr,
+                    style: TextStyle(
+                      color: _accentColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-            if (!isDockedActivity) ...[
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: activity.nameController,
-                      textInputAction: TextInputAction.done,
-                      decoration: InputDecoration(
-                        hintText: 'نام فعالیت',
-                        isDense: true,
-                        filled: true,
-                        fillColor: const Color(0xFFF7F8FC),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      onChanged: (value) {
-                        activity.name = value;
-                        if (mounted) setState(() {});
-                      },
-                      onSubmitted: (_) => _saveActivityName(activity),
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                  IconButton.filled(
-                    tooltip: 'ذخیره نام فعالیت',
-                    onPressed: () => _saveActivityName(activity),
-                    icon: const Icon(Icons.save_outlined, size: 19),
-                    style: IconButton.styleFrom(
-                      backgroundColor: _accentColor,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 9),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: isRunning ? null : () => _startActivity(activity),
-                      icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                      label: const Text('شروع'),
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: FilledButton.tonalIcon(
-                      onPressed: isRunning ? () => _pauseActivity(activity) : null,
-                      icon: const Icon(Icons.pause_rounded, size: 18),
-                      label: const Text('مکث'),
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () => _stopActivity(activity),
-                      icon: const Icon(Icons.stop_rounded, size: 18),
-                      label: const Text('توقف'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFFFFE8E8),
-                        foregroundColor: const Color(0xFFC62828),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            const SizedBox(width: 4),
+            IconButton(
+              tooltip: 'شروع',
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+              padding: EdgeInsets.zero,
+              onPressed: isRunning ? null : () => _startActivity(activity),
+              icon: const Icon(Icons.play_arrow_rounded, size: 21),
+              color: Colors.green,
+            ),
+            IconButton(
+              tooltip: 'مکث',
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+              padding: EdgeInsets.zero,
+              onPressed: isRunning ? () => _pauseActivity(activity) : null,
+              icon: const Icon(Icons.pause_rounded, size: 21),
+              color: Colors.orange,
+            ),
+            IconButton(
+              tooltip: 'توقف و ثبت',
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+              padding: EdgeInsets.zero,
+              onPressed: () => _stopActivity(activity),
+              icon: const Icon(Icons.stop_rounded, size: 21),
+              color: Colors.redAccent,
+            ),
           ],
         ),
       ),
