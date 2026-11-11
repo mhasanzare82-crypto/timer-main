@@ -1095,6 +1095,16 @@ class _MainScreenState extends State<MainScreen> {
               icon: const Icon(Icons.palette_outlined),
             ),
           ],
+          if (_selectedIndex == 4) ...[
+            IconButton(tooltip: 'چک‌لیست جدید', onPressed: _addChecklist, icon: const Icon(Icons.add_task_rounded)),
+            IconButton(tooltip: 'ساخت چک‌لیست از متن', onPressed: _createChecklistFromMultilineText, icon: const Icon(Icons.edit_note_rounded)),
+            IconButton(tooltip: 'ورود از فایل اکسل', onPressed: _importChecklistExcel, icon: const Icon(Icons.file_open_outlined)),
+            IconButton(tooltip: 'ورود از فایل TXT', onPressed: _importChecklistTxt, icon: const Icon(Icons.upload_file_rounded)),
+            IconButton(tooltip: 'خروجی اکسل یک چک‌لیست', onPressed: _chooseChecklistForExcelExport, icon: const Icon(Icons.table_view_outlined)),
+            IconButton(tooltip: 'خروجی همه چک‌لیست‌ها (TXT)', onPressed: _exportChecklistsTxt, icon: const Icon(Icons.text_snippet_outlined)),
+            IconButton(tooltip: 'تهیه پشتیبان', onPressed: _backupChecklists, icon: const Icon(Icons.backup_outlined)),
+            IconButton(tooltip: 'بازیابی پشتیبان', onPressed: _restoreChecklistsBackup, icon: const Icon(Icons.settings_backup_restore_rounded)),
+          ],
         ],
       ),
       body: IndexedStack(
@@ -1795,6 +1805,25 @@ class _MainScreenState extends State<MainScreen> {
     await Share.shareXFiles([XFile(file.path)], text: 'خروجی چک‌لیست‌ها');
   }
 
+  Future<void> _chooseChecklistForExcelExport() async {
+    if (_checklists.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('چک‌لیستی برای خروجی وجود ندارد.')),
+      );
+      return;
+    }
+    final selected = await showDialog<_Checklist>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('انتخاب چک‌لیست برای خروجی اکسل'),
+        children: _checklists.map((list) => SimpleDialogOption(
+          onPressed: () => Navigator.pop(ctx, list),
+          child: Text(list.title),
+        )).toList(),
+      ),
+    );
+    if (selected != null && mounted) await _exportChecklistExcel(selected);
+  }
   Future<void> _exportChecklistExcel(_Checklist list) async {
     if (list.items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1979,6 +2008,67 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
+  Future<void> _importChecklistExcel() async {
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xlsx'],
+      withData: true,
+    );
+    if (picked == null || picked.files.single.bytes == null || !mounted) return;
+
+    try {
+      final workbook = Excel.decodeBytes(picked.files.single.bytes!);
+      if (workbook.tables.isEmpty) {
+        throw const FormatException('در فایل اکسل هیچ برگه‌ای پیدا نشد.');
+      }
+
+      // از اولین برگه استفاده می‌کنیم؛ هر ردیف غیرخالی یک مورد چک‌لیست است.
+      final sheet = workbook.tables[workbook.tables.keys.first]!;
+      final items = <_ChecklistItem>[];
+      for (final row in sheet.rows) {
+        final values = row
+            .map((cell) => cell?.value?.toString().trim() ?? '')
+            .where((value) => value.isNotEmpty)
+            .toList();
+        if (values.isEmpty) continue;
+        items.add(_ChecklistItem(title: values.join(' | ')));
+      }
+
+      if (items.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('فایل اکسل ردیف قابل استفاده‌ای ندارد.')),
+        );
+        return;
+      }
+
+      final fileName = picked.files.single.name.replaceFirst(
+        RegExp(r'\.xlsx$', caseSensitive: false),
+        '',
+      );
+      final checklistName = fileName.isEmpty ? 'چک‌لیست واردشده' : fileName;
+      setState(() => _checklists.insert(0, _Checklist(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        title: checklistName,
+        items: items,
+      )));
+      await _persistChecklists();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(
+            items.length.toString() + ' ردیف از فایل اکسل به چک‌لیست «' +
+            checklistName + '» وارد شد.',
+          )),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خواندن فایل اکسل ناموفق بود: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _createChecklistFromMultilineText() async {
     final controller = TextEditingController();
     final text = await showDialog<String>(
@@ -2073,19 +2163,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildChecklistsPage() {
     return ListView(padding: const EdgeInsets.all(16), children: [
-      Row(children: [
-        const Expanded(child: Text('چک‌لیست‌های من', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold))),
-        FilledButton.icon(onPressed: _addChecklist, icon: const Icon(Icons.add), label: const Text('چک‌لیست جدید'),
-          style: FilledButton.styleFrom(backgroundColor: _accentColor)),
-      ]),
-      const SizedBox(height: 10),
-      Wrap(spacing: 8, runSpacing: 8, children: [
-        OutlinedButton.icon(onPressed: _exportChecklistsTxt, icon: const Icon(Icons.text_snippet_outlined), label: const Text('خروجی TXT')),
-        OutlinedButton.icon(onPressed: _createChecklistFromMultilineText, icon: const Icon(Icons.edit_note), label: const Text('ورود سریع با متن')),
-        OutlinedButton.icon(onPressed: _importChecklistTxt, icon: const Icon(Icons.upload_file), label: const Text('ورود از فایل TXT')),
-        OutlinedButton.icon(onPressed: _backupChecklists, icon: const Icon(Icons.backup_outlined), label: const Text('پشتیبان چک‌لیست‌ها')),
-        OutlinedButton.icon(onPressed: _restoreChecklistsBackup, icon: const Icon(Icons.restore), label: const Text('بازیابی پشتیبان')),
-      ]),
+      const Text('چک‌لیست‌های من', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
       const SizedBox(height: 8),
       const Text('برای هر بخش از کارها یک چک‌لیست جدا بساز و موارد انجام‌شده را علامت بزن.',
         style: TextStyle(color: Colors.black54, height: 1.6)),
@@ -2109,11 +2187,6 @@ class _MainScreenState extends State<MainScreen> {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    tooltip: 'ذخیره گزارش اکسل این چک‌لیست',
-                    onPressed: () => _exportChecklistExcel(list),
-                    icon: Icon(Icons.file_download_outlined, color: _accentColor),
-                  ),
                   PopupMenuButton<String>(
                     onSelected: (value) {
                       if (value == 'edit') _editChecklist(list);
