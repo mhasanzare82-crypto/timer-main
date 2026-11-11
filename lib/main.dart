@@ -1100,6 +1100,7 @@ class _MainScreenState extends State<MainScreen> {
             IconButton(tooltip: 'ساخت چک‌لیست از متن', onPressed: _createChecklistFromMultilineText, icon: const Icon(Icons.edit_note_rounded)),
             IconButton(tooltip: 'ورود از فایل اکسل', onPressed: _importChecklistExcel, icon: const Icon(Icons.file_open_outlined)),
             IconButton(tooltip: 'ورود از فایل TXT', onPressed: _importChecklistTxt, icon: const Icon(Icons.upload_file_rounded)),
+            IconButton(tooltip: 'خروجی اکسل یک چک‌لیست', onPressed: _chooseChecklistForExcelExport, icon: const Icon(Icons.table_view_outlined)),
             IconButton(tooltip: 'خروجی همه چک‌لیست‌ها (TXT)', onPressed: _exportChecklistsTxt, icon: const Icon(Icons.text_snippet_outlined)),
             IconButton(tooltip: 'تهیه پشتیبان', onPressed: _backupChecklists, icon: const Icon(Icons.backup_outlined)),
             IconButton(tooltip: 'بازیابی پشتیبان', onPressed: _restoreChecklistsBackup, icon: const Icon(Icons.settings_backup_restore_rounded)),
@@ -1804,6 +1805,25 @@ class _MainScreenState extends State<MainScreen> {
     await Share.shareXFiles([XFile(file.path)], text: 'خروجی چک‌لیست‌ها');
   }
 
+  Future<void> _chooseChecklistForExcelExport() async {
+    if (_checklists.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('چک‌لیستی برای خروجی وجود ندارد.')),
+      );
+      return;
+    }
+    final selected = await showDialog<_Checklist>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('انتخاب چک‌لیست برای خروجی اکسل'),
+        children: _checklists.map((list) => SimpleDialogOption(
+          onPressed: () => Navigator.pop(ctx, list),
+          child: Text(list.title),
+        )).toList(),
+      ),
+    );
+    if (selected != null && mounted) await _exportChecklistExcel(selected);
+  }
   Future<void> _exportChecklistExcel(_Checklist list) async {
     if (list.items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2167,11 +2187,6 @@ class _MainScreenState extends State<MainScreen> {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    tooltip: 'ذخیره گزارش اکسل این چک‌لیست',
-                    onPressed: () => _exportChecklistExcel(list),
-                    icon: Icon(Icons.file_download_outlined, color: _accentColor),
-                  ),
                   PopupMenuButton<String>(
                     onSelected: (value) {
                       if (value == 'edit') _editChecklist(list);
