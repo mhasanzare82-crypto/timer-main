@@ -540,6 +540,8 @@ class _MainScreenState extends State<MainScreen> {
   static const _checklistTitleFontSizeKey = 'checklist_title_font_size_v1';
   static const _checklistItemFontPathKey = 'checklist_item_font_path_v1';
   static const _checklistTitleFontPathKey = 'checklist_title_font_path_v1';
+  static const _checklistItemFontFamilyKey = 'checklist_item_font_family_v1';
+  static const _checklistTitleFontFamilyKey = 'checklist_title_font_family_v1';
   double _checklistItemFontSize = 15;
   double _checklistTitleFontSize = 16;
   String? _checklistItemFontFamily;
@@ -2176,17 +2178,17 @@ class _MainScreenState extends State<MainScreen> {
     final prefs = await SharedPreferences.getInstance();
     final itemPath = prefs.getString(_checklistItemFontPathKey);
     final titlePath = prefs.getString(_checklistTitleFontPathKey);
-    String? itemFamily;
-    String? titleFamily;
+    String? itemFamily = prefs.getString(_checklistItemFontFamilyKey);
+    String? titleFamily = prefs.getString(_checklistTitleFontFamilyKey);
     try {
       if (itemPath != null && await File(itemPath).exists()) {
-        itemFamily = 'ChecklistItemFont';
+        itemFamily ??= 'ChecklistItemFont';
         final bytes = await File(itemPath).readAsBytes();
         final loader = FontLoader(itemFamily)..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)));
         await loader.load();
       }
       if (titlePath != null && await File(titlePath).exists()) {
-        titleFamily = 'ChecklistTitleFont';
+        titleFamily ??= 'ChecklistTitleFont';
         final bytes = await File(titlePath).readAsBytes();
         final loader = FontLoader(titleFamily)..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)));
         await loader.load();
@@ -2218,11 +2220,12 @@ class _MainScreenState extends State<MainScreen> {
       final safeName = picked.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
       final destination = File('${fontsDirectory.path}/${forTitle ? 'title' : 'item'}_${DateTime.now().millisecondsSinceEpoch}_$safeName');
       await destination.writeAsBytes(bytes, flush: true);
-      final family = forTitle ? 'ChecklistTitleFont' : 'ChecklistItemFont';
+      final family = '${forTitle ? 'ChecklistTitleFont' : 'ChecklistItemFont'}${DateTime.now().microsecondsSinceEpoch}';
       final loader = FontLoader(family)..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)));
       await loader.load();
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(forTitle ? _checklistTitleFontPathKey : _checklistItemFontPathKey, destination.path);
+      await prefs.setString(forTitle ? _checklistTitleFontFamilyKey : _checklistItemFontFamilyKey, family);
       if (!mounted) return;
       setState(() {
         if (forTitle) {
