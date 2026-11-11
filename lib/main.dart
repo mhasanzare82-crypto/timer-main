@@ -382,111 +382,97 @@ class _Checklist {
 }
 
 
-class _ActivityDetailPage extends StatelessWidget {
+class _ActivityDetailPage extends StatefulWidget {
   final String name;
   final List<_SavedActivity> sessions;
   final Color accentColor;
   final String Function(Duration) formatDuration;
   final String Function(String) persianDigits;
+  final Future<void> Function(_SavedActivity) onEdit;
+  final Future<void> Function(_SavedActivity) onDelete;
 
   const _ActivityDetailPage({
-    required this.name,
-    required this.sessions,
-    required this.accentColor,
-    required this.formatDuration,
-    required this.persianDigits,
+    required this.name, required this.sessions, required this.accentColor,
+    required this.formatDuration, required this.persianDigits,
+    required this.onEdit, required this.onDelete,
   });
 
   @override
+  State<_ActivityDetailPage> createState() => _ActivityDetailPageState();
+}
+
+class _ActivityDetailPageState extends State<_ActivityDetailPage> {
+  @override
   Widget build(BuildContext context) {
+    final sessions = widget.sessions;
     final total = sessions.fold<int>(0, (sum, item) => sum + item.durationSeconds);
     return Scaffold(
-      appBar: AppBar(title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold))),
+      appBar: AppBar(title: Text(widget.name, style: const TextStyle(fontWeight: FontWeight.bold))),
       body: sessions.isEmpty
-          ? const Center(child: Text('هنوز سابقه‌ای برای این فعالیت ثبت نشده است.'))
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              children: [
-                Text('سوابق فعالیت', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: accentColor)),
-                const SizedBox(height: 12),
-                ...sessions.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final item = entry.value;
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    color: Colors.white,
-                    child: Padding(
-                      padding: const EdgeInsets.all(15),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text('نوبت ${persianDigits((index + 1).toString())}',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: accentColor)),
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF7F8FC),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              reverse: true,
-                              child: Text.rich(
-                                TextSpan(
-                                  style: const TextStyle(fontSize: 12, color: Colors.black87),
-                                  children: [
-                                    const TextSpan(text: 'شروع: ', style: TextStyle(color: Colors.black54)),
-                                    TextSpan(text: '${item.startDate} - ${item.startTime}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                                    const TextSpan(text: '   |   پایان: ', style: TextStyle(color: Colors.black54)),
-                                    TextSpan(text: '${item.endDate} - ${item.endTime}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                                    const TextSpan(text: '   |   مدت: ', style: TextStyle(color: Colors.black54)),
-                                    TextSpan(
-                                      text: formatDuration(Duration(seconds: item.durationSeconds)),
-                                      style: TextStyle(fontWeight: FontWeight.bold, color: accentColor),
-                                    ),
-                                  ],
-                                ),
-                                maxLines: 1,
-                                softWrap: false,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+        ? const Center(child: Text('هنوز سابقه‌ای برای این فعالیت ثبت نشده است.'))
+        : ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
+          Text('سوابق فعالیت', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: widget.accentColor)),
+          const SizedBox(height: 12),
+          ...sessions.asMap().entries.map((entry) {
+            final index = entry.key;
+            final item = entry.value;
+            return Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              color: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(15),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Row(children: [
+                    Expanded(child: Text('نوبت ${widget.persianDigits((index + 1).toString())}',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: widget.accentColor))),
+                    PopupMenuButton<String>(
+                      tooltip: 'مدیریت سابقه',
+                      onSelected: (value) async {
+                        if (value == 'edit') { await widget.onEdit(item); }
+                        if (value == 'delete') { await widget.onDelete(item); }
+                        if (mounted) setState(() {});
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined), SizedBox(width: 8), Text('ویرایش')])),
+                        PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, color: Colors.red), SizedBox(width: 8), Text('حذف', style: TextStyle(color: Colors.red))])),
+                      ],
                     ),
-                  );
-                }),
-                const SizedBox(height: 8),
-                Card(
-                  color: accentColor.withValues(alpha: 0.09),
-                  elevation: 0,
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(children: [
-                      const Text('مجموع کل زمان این فعالیت', style: TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      Text(formatDuration(Duration(seconds: total)),
-                        textDirection: TextDirection.ltr,
-                        style: TextStyle(fontSize: 27, fontWeight: FontWeight.bold, color: accentColor)),
-                      const SizedBox(height: 4),
-                      Text('تعداد دفعات: ${persianDigits(sessions.length.toString())}',
-                        style: const TextStyle(color: Colors.black54)),
-                    ]),
+                  ]),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                    decoration: BoxDecoration(color: const Color(0xFFF7F8FC), borderRadius: BorderRadius.circular(12)),
+                    child: SingleChildScrollView(scrollDirection: Axis.horizontal, reverse: true,
+                      child: Text.rich(TextSpan(style: const TextStyle(fontSize: 12, color: Colors.black87), children: [
+                        const TextSpan(text: 'شروع: ', style: TextStyle(color: Colors.black54)),
+                        TextSpan(text: '${item.startDate} - ${item.startTime}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                        const TextSpan(text: '   |   پایان: ', style: TextStyle(color: Colors.black54)),
+                        TextSpan(text: '${item.endDate} - ${item.endTime}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                        const TextSpan(text: '   |   مدت: ', style: TextStyle(color: Colors.black54)),
+                        TextSpan(text: widget.formatDuration(Duration(seconds: item.durationSeconds)),
+                          style: TextStyle(fontWeight: FontWeight.bold, color: widget.accentColor)),
+                      ]), maxLines: 1, softWrap: false),
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ]),
+              ),
+            );
+          }),
+          const SizedBox(height: 8),
+          Card(color: widget.accentColor.withValues(alpha: 0.09), elevation: 0,
+            child: Padding(padding: const EdgeInsets.all(18), child: Column(children: [
+              const Text('مجموع کل زمان این فعالیت', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Text(widget.formatDuration(Duration(seconds: total)), textDirection: TextDirection.ltr,
+                style: TextStyle(fontSize: 27, fontWeight: FontWeight.bold, color: widget.accentColor)),
+              const SizedBox(height: 4),
+              Text('تعداد دفعات: ${widget.persianDigits(sessions.length.toString())}',
+                style: const TextStyle(color: Colors.black54)),
+            ])),
+          ),
+        ]),
     );
   }
-
-  Widget _line(String label, String value) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 3),
-    child: Row(children: [
-      SizedBox(width: 95, child: Text(label, style: const TextStyle(color: Colors.black54))),
-      Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w500))),
-    ]),
-  );
 }
 
 class MainScreen extends StatefulWidget {
@@ -772,17 +758,94 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _openActivityDetails(String name) async {
-    final sessions = _savedActivities.where((a) => a.name == name).toList()
-      ..sort((a, b) => b.startDate.compareTo(a.startDate));
     await Navigator.push(context, MaterialPageRoute(
       builder: (_) => _ActivityDetailPage(
         name: name,
-        sessions: sessions,
+        sessions: _savedActivities.where((a) => a.name == name).toList()
+          ..sort((a, b) => b.startDate.compareTo(a.startDate)),
         accentColor: _accentColor,
         formatDuration: _durationText,
         persianDigits: _persianDigits,
+        onEdit: _editSavedActivity,
+        onDelete: _deleteSavedActivity,
       ),
     ));
+  }
+
+  Future<void> _editSavedActivity(_SavedActivity activity) async {
+    final index = _savedActivities.indexOf(activity);
+    if (index < 0) return;
+    final hours = TextEditingController(text: (activity.durationSeconds ~/ 3600).toString());
+    final minutes = TextEditingController(text: ((activity.durationSeconds % 3600) ~/ 60).toString());
+    final seconds = TextEditingController(text: (activity.durationSeconds % 60).toString());
+    final startDate = TextEditingController(text: activity.startDate);
+    final startTime = TextEditingController(text: activity.startTime);
+    final endDate = TextEditingController(text: activity.endDate);
+    final endTime = TextEditingController(text: activity.endTime);
+    final result = await showDialog<_SavedActivity>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ویرایش سابقه زمانی'),
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('مدت زمان'),
+          Row(children: [
+            Expanded(child: TextField(controller: hours, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'ساعت'))),
+            const SizedBox(width: 8),
+            Expanded(child: TextField(controller: minutes, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'دقیقه'))),
+            const SizedBox(width: 8),
+            Expanded(child: TextField(controller: seconds, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'ثانیه'))),
+          ]),
+          const SizedBox(height: 12),
+          TextField(controller: startDate, decoration: const InputDecoration(labelText: 'تاریخ شروع')),
+          TextField(controller: startTime, decoration: const InputDecoration(labelText: 'ساعت شروع')),
+          TextField(controller: endDate, decoration: const InputDecoration(labelText: 'تاریخ پایان')),
+          TextField(controller: endTime, decoration: const InputDecoration(labelText: 'ساعت پایان')),
+        ])),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
+          FilledButton(onPressed: () {
+            final h = int.tryParse(hours.text.trim());
+            final m = int.tryParse(minutes.text.trim());
+            final sec = int.tryParse(seconds.text.trim());
+            if (h == null || m == null || sec == null || h < 0 || m < 0 || sec < 0 ||
+                m > 59 || sec > 59 || h + m + sec == 0 ||
+                startDate.text.trim().isEmpty || startTime.text.trim().isEmpty ||
+                endDate.text.trim().isEmpty || endTime.text.trim().isEmpty) {
+              ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('اطلاعات زمان را به‌درستی وارد کن.')));
+              return;
+            }
+            Navigator.pop(ctx, _SavedActivity(
+              name: activity.name,
+              startDate: startDate.text.trim(), startTime: startTime.text.trim(),
+              endDate: endDate.text.trim(), endTime: endTime.text.trim(),
+              durationSeconds: h * 3600 + m * 60 + sec,
+            ));
+          }, child: const Text('ذخیره تغییرات')),
+        ],
+      ),
+    );
+    for (final c in [hours, minutes, seconds, startDate, startTime, endDate, endTime]) { c.dispose(); }
+    if (result == null || !mounted) return;
+    setState(() => _savedActivities[index] = result);
+    await _persistActivities();
+  }
+
+  Future<void> _deleteSavedActivity(_SavedActivity activity) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حذف سابقه زمانی'),
+        content: Text('سابقه «${activity.name}» حذف شود؟ این کار قابل بازگشت نیست.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('حذف', style: TextStyle(color: Colors.white))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _savedActivities.remove(activity));
+    await _persistActivities();
   }
 
   Future<void> _persistActivityNames() async {
