@@ -536,6 +536,14 @@ class _MainScreenState extends State<MainScreen> {
   Map<String, String> _activityCategories = {};
   List<String> _activityCategoryNames = [];
   List<_Checklist> _checklists = [];
+  static const _checklistItemFontSizeKey = 'checklist_item_font_size_v1';
+  static const _checklistTitleFontSizeKey = 'checklist_title_font_size_v1';
+  static const _checklistItemFontPathKey = 'checklist_item_font_path_v1';
+  static const _checklistTitleFontPathKey = 'checklist_title_font_path_v1';
+  double _checklistItemFontSize = 15;
+  double _checklistTitleFontSize = 16;
+  String? _checklistItemFontFamily;
+  String? _checklistTitleFontFamily;
 
   @override
   void initState() {
@@ -546,6 +554,7 @@ class _MainScreenState extends State<MainScreen> {
     _loadProgramClockSettings();
     _initializeData();
     _loadChecklists();
+    _loadChecklistTypographySettings();
     _initializeAlarmNotifications();
     _countdownTicker=Timer.periodic(const Duration(seconds:1), (_) => _tickCountdowns());
   }
@@ -1104,6 +1113,7 @@ class _MainScreenState extends State<MainScreen> {
             IconButton(tooltip: 'خروجی همه چک‌لیست‌ها (TXT)', onPressed: _exportChecklistsTxt, icon: const Icon(Icons.text_snippet_outlined)),
             IconButton(tooltip: 'تهیه پشتیبان', onPressed: _backupChecklists, icon: const Icon(Icons.backup_outlined)),
             IconButton(tooltip: 'بازیابی پشتیبان', onPressed: _restoreChecklistsBackup, icon: const Icon(Icons.settings_backup_restore_rounded)),
+            IconButton(tooltip: 'تنظیم اندازه و فونت', onPressed: _showChecklistTypographySettings, icon: const Icon(Icons.text_fields_rounded)),
           ],
         ],
       ),
@@ -2161,6 +2171,148 @@ class _MainScreenState extends State<MainScreen> {
     await _persistChecklists();
   }
 
+
+  Future<void> _loadChecklistTypographySettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final itemPath = prefs.getString(_checklistItemFontPathKey);
+    final titlePath = prefs.getString(_checklistTitleFontPathKey);
+    String? itemFamily;
+    String? titleFamily;
+    try {
+      if (itemPath != null && await File(itemPath).exists()) {
+        itemFamily = 'ChecklistItemFont';
+        final bytes = await File(itemPath).readAsBytes();
+        final loader = FontLoader(itemFamily)..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)));
+        await loader.load();
+      }
+      if (titlePath != null && await File(titlePath).exists()) {
+        titleFamily = 'ChecklistTitleFont';
+        final bytes = await File(titlePath).readAsBytes();
+        final loader = FontLoader(titleFamily)..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)));
+        await loader.load();
+      }
+    } catch (_) {
+      // A missing or invalid custom font should not prevent the app from opening.
+    }
+    if (!mounted) return;
+    setState(() {
+      _checklistItemFontSize = prefs.getDouble(_checklistItemFontSizeKey) ?? 15;
+      _checklistTitleFontSize = prefs.getDouble(_checklistTitleFontSizeKey) ?? 16;
+      _checklistItemFontFamily = itemFamily;
+      _checklistTitleFontFamily = titleFamily;
+    });
+  }
+
+  Future<void> _pickChecklistFont({required bool forTitle}) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom, allowedExtensions: ['ttf', 'otf'], withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final picked = result.files.single;
+    try {
+      final bytes = picked.bytes ?? (picked.path == null ? null : await File(picked.path!).readAsBytes());
+      if (bytes == null) throw Exception('خواندن فایل فونت ممکن نشد.');
+      final directory = await getApplicationSupportDirectory();
+      final fontsDirectory = Directory('${directory.path}/checklist_fonts');
+      await fontsDirectory.create(recursive: true);
+      final safeName = picked.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+      final destination = File('${fontsDirectory.path}/${forTitle ? 'title' : 'item'}_${DateTime.now().millisecondsSinceEpoch}_$safeName');
+      await destination.writeAsBytes(bytes, flush: true);
+      final family = forTitle ? 'ChecklistTitleFont' : 'ChecklistItemFont';
+      final loader = FontLoader(family)..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)));
+      await loader.load();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(forTitle ? _checklistTitleFontPathKey : _checklistItemFontPathKey, destination.path);
+      if (!mounted) return;
+      setState(() {
+        if (forTitle) {
+          _checklistTitleFontFamily = family;
+        } else {
+          _checklistItemFontFamily = family;
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فونت «${picked.name}» اضافه شد.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در افزودن فونت: $e')));
+    }
+  }
+
+  Future<void> _showChecklistTypographySettings() async {
+    double itemSize = _checklistItemFontSize;
+    double titleSize = _checklistTitleFontSize;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('تنظیم اندازه و فونت چک‌لیست‌ها'),
+          content: SizedBox(
+            width: 380,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text('اندازه نوشته موارد چک‌لیست', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Slider(
+                    min: 10, max: 30, divisions: 20, value: itemSize,
+                    label: itemSize.toStringAsFixed(0),
+                    onChanged: (value) => setDialogState(() => itemSize = value),
+                  ),
+                  Text('اندازه فعلی: ${itemSize.toStringAsFixed(0)}'),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(dialogContext);
+                      await _pickChecklistFont(forTitle: false);
+                      if (mounted) _showChecklistTypographySettings();
+                    },
+                    icon: const Icon(Icons.font_download_outlined),
+                    label: Text(_checklistItemFontFamily == null ? 'افزودن فونت موارد' : 'تغییر فونت موارد'),
+                  ),
+                  const Divider(height: 28),
+                  const Text('اندازه عنوان چک‌لیست‌ها', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Slider(
+                    min: 10, max: 32, divisions: 22, value: titleSize,
+                    label: titleSize.toStringAsFixed(0),
+                    onChanged: (value) => setDialogState(() => titleSize = value),
+                  ),
+                  Text('اندازه فعلی: ${titleSize.toStringAsFixed(0)}'),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(dialogContext);
+                      await _pickChecklistFont(forTitle: true);
+                      if (mounted) _showChecklistTypographySettings();
+                    },
+                    icon: const Icon(Icons.font_download_outlined),
+                    label: Text(_checklistTitleFontFamily == null ? 'افزودن فونت عنوان‌ها' : 'تغییر فونت عنوان‌ها'),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text('فایل فونت باید با فرمت TTF یا OTF باشد.', style: TextStyle(color: Colors.black54, fontSize: 12)),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('انصراف')),
+            FilledButton(
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setDouble(_checklistItemFontSizeKey, itemSize);
+                await prefs.setDouble(_checklistTitleFontSizeKey, titleSize);
+                if (!mounted) return;
+                setState(() {
+                  _checklistItemFontSize = itemSize;
+                  _checklistTitleFontSize = titleSize;
+                });
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('ذخیره تنظیمات'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildChecklistsPage() {
     return ListView(padding: const EdgeInsets.all(16), children: [
       const Text('چک‌لیست‌های من', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
@@ -2181,7 +2333,7 @@ class _MainScreenState extends State<MainScreen> {
             child: ExpansionTile(
               key: PageStorageKey<String>(list.id),
               leading: Icon(Icons.checklist_rounded, color: _accentColor),
-              title: Text(list.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              title: Text(list.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: _checklistTitleFontSize, fontFamily: _checklistTitleFontFamily)),
               subtitle: Text('انجام‌شده: ${_persianDigits(done.toString())} از ${_persianDigits(total.toString())}'),
               childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
               trailing: Row(
@@ -2214,7 +2366,8 @@ class _MainScreenState extends State<MainScreen> {
                       await _persistChecklists();
                     }),
                   title: Text(item.title,
-                    style: TextStyle(decoration: item.done ? TextDecoration.lineThrough : null,
+                    style: TextStyle(fontSize: _checklistItemFontSize, fontFamily: _checklistItemFontFamily,
+                      decoration: item.done ? TextDecoration.lineThrough : null,
                       color: item.done ? Colors.black45 : null)),
                   subtitle: item.history.isEmpty ? null : Text(
                     'آخرین تغییر: ${_jalaliDate(DateTime.parse(item.history.last['at'] as String))} - ${_clockTime(DateTime.parse(item.history.last['at'] as String))}'),
