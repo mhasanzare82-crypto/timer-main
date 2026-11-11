@@ -1226,6 +1226,24 @@ class _MainScreenState extends State<MainScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
         child: Row(
           children: [
+            IconButton(
+              tooltip: 'ذخیره نام فعالیت',
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(width: 30, height: 36),
+              padding: EdgeInsets.zero,
+              onPressed: () => _saveActivityName(activity),
+              icon: const Icon(Icons.save_outlined, size: 18),
+              color: _accentColor,
+            ),
+            IconButton(
+              tooltip: 'حذف فعالیت',
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(width: 30, height: 36),
+              padding: EdgeInsets.zero,
+              onPressed: () => _deleteRunningActivity(activity),
+              icon: const Icon(Icons.delete_outline_rounded, size: 18),
+              color: Colors.redAccent,
+            ),
             Expanded(
               flex: 5,
               child: TextField(
@@ -1248,24 +1266,6 @@ class _MainScreenState extends State<MainScreen> {
                 },
                 onSubmitted: (_) => _saveActivityName(activity),
               ),
-            ),
-            IconButton(
-              tooltip: 'ذخیره نام فعالیت',
-              visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints.tightFor(width: 30, height: 36),
-              padding: EdgeInsets.zero,
-              onPressed: () => _saveActivityName(activity),
-              icon: const Icon(Icons.save_outlined, size: 18),
-              color: _accentColor,
-            ),
-            IconButton(
-              tooltip: 'حذف فعالیت',
-              visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints.tightFor(width: 30, height: 36),
-              padding: EdgeInsets.zero,
-              onPressed: () => _deleteRunningActivity(activity),
-              icon: const Icon(Icons.delete_outline_rounded, size: 18),
-              color: Colors.redAccent,
             ),
             const SizedBox(width: 2),
             Expanded(
