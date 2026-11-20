@@ -1029,10 +1029,6 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _startNewActivity(String name) async {
     if (name.trim().isEmpty) return;
-    if (_runningActivities.any((a) => a.stopwatch.isRunning && a.name.trim().toLowerCase() != name.trim().toLowerCase())) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ابتدا تایمر فعال دیگر را مکث یا متوقف کن.')));
-      return;
-    }
     final existing = _runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull;
     if (existing != null) {
       if (!existing.stopwatch.isRunning) await _startActivity(existing);
@@ -1048,10 +1044,6 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _createActivityTimer() async {
-    if (_runningActivities.any((a) => a.stopwatch.isRunning)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ابتدا تایمر فعال دیگر را مکث یا متوقف کن.')));
-      return;
-    }
     final activity = _RunningActivity(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: '',
@@ -1130,10 +1122,6 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _startActivity(_RunningActivity activity) async {
     if (activity.stopwatch.isRunning) return;
-    if (_runningActivities.any((a) => a.id != activity.id && a.stopwatch.isRunning)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('هم‌زمان فقط یک تایمر می‌تواند در حال اجرا باشد.')));
-      return;
-    }
     setState(() => activity.stopwatch.start());
     await _persistRunningActivities();
   }
