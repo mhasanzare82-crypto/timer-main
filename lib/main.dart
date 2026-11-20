@@ -2263,6 +2263,8 @@ class _MainScreenState extends State<MainScreen> {
           'برای مشاهده سوابق، روی فعالیت بزن. فعالیت‌ها را می‌توانی در پوشه‌های مختلف مرتب کنی.',
           style: TextStyle(color: Colors.black54, height: 1.6),
         ),
+        const SizedBox(height: 8),
+        SegmentedButton<bool>(segments: const [ButtonSegment<bool>(value: true, label: Text('پوشه‌ای'), icon: Icon(Icons.folder_outlined)), ButtonSegment<bool>(value: false, label: Text('لیستی'), icon: Icon(Icons.list))], selected: {_activitiesGroupedView}, onSelectionChanged: (selection) => setState(() => _activitiesGroupedView = selection.first)),
         const SizedBox(height: 14),
         if (_activityNames.isEmpty)
           const Padding(
