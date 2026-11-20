@@ -1864,7 +1864,7 @@ class _MainScreenState extends State<MainScreen> {
       'activityCategories': _activityCategories,
       'activityCategoryNames': _activityCategoryNames,
     });
-    final path = await FilePicker.platform.saveFile(
+    final path = await FilePicker.saveFile(
       dialogTitle: 'ذخیره فایل پشتیبان',
       fileName: 'timer_backup.json',
       type: FileType.custom,
@@ -1875,7 +1875,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _restoreData() async {
-    final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['json'], withData: true);
+    final picked = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['json'], withData: true);
     if (picked == null || picked.files.single.bytes == null || !mounted) return;
     try {
       final data = jsonDecode(utf8.decode(picked.files.single.bytes!)) as Map<String, dynamic>;
