@@ -594,6 +594,33 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
+  Future<String?> _askChecklistText({
+    required String title,
+    required String hint,
+    String initial = '',
+  }) async {
+    final controller = TextEditingController(text: initial);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          decoration: InputDecoration(hintText: hint, border: const OutlineInputBorder()),
+          onSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('ذخیره')),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
+  }
+
   Future<void> _loadActivities() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_storageKey);
@@ -696,7 +723,7 @@ class _MainScreenState extends State<MainScreen> {
                   final edited = await _askChecklistText(title: 'ویرایش پوشه', hint: 'نام پوشه', initial: category);
                   if (edited == null || edited.trim().isEmpty || !mounted) return;
                   setState(() {
-                    _activityCategoryNames = _activityCategoryNames.map((c) => c == category ? edited.trim() : c).toSet().toList()..sort();
+                    _activityCategoryNames = _activityCategoryNames.map<String>((c) => c == category ? edited.trim() : c).toSet().toList()..sort();
                     _activityCategories.updateAll((key, value) => value == category ? edited.trim() : value);
                   });
                   await _persistActivityCategoryNames(); await _persistActivityCategories();
@@ -735,7 +762,7 @@ class _MainScreenState extends State<MainScreen> {
       return;
     }
     setState(() {
-      _activityNames = _activityNames.map((n) => n == oldName ? newName : n).toList()..sort();
+      _activityNames = _activityNames.map<String>((n) => n == oldName ? newName : n).toList()..sort();
       if (_activityCategories.containsKey(oldName)) {
         _activityCategories[newName] = _activityCategories.remove(oldName)!;
       }
@@ -1875,10 +1902,11 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _restoreData() async {
-    final picked = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['json'], withData: true);
-    if (picked == null || picked.files.single.bytes == null || !mounted) return;
+    final picked = await FilePicker.pickFile(type: FileType.custom, allowedExtensions: ['json']);
+    if (picked == null || !mounted) return;
     try {
-      final data = jsonDecode(utf8.decode(picked.files.single.bytes!)) as Map<String, dynamic>;
+      final fileBytes = await picked.readAsBytes();
+      final data = jsonDecode(utf8.decode(fileBytes)) as Map<String, dynamic>;
       if (data['format'] != 'timer_main_backup' || data['version'] != 1) throw const FormatException('فایل پشتیبان معتبر نیست.');
       final names = (data['activityNames'] as List<dynamic>).cast<String>().toSet().toList();
       final saved = (data['savedActivities'] as List<dynamic>).map((e) => _SavedActivity.fromJson(Map<String, dynamic>.from(e as Map))).toList();
