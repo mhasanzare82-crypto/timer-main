@@ -2245,16 +2245,6 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _buildActivitiesPage() {
-    final totalByName = <String, int>{};
-    for (final item in _savedActivities) {
-      totalByName[item.name] = (totalByName[item.name] ?? 0) + item.durationSeconds;
-    }
-    final grouped = <String, List<String>>{};
-    for (final name in _activityNames) {
-      final category = _activityCategories[name] ?? 'بدون پوشه';
-      (grouped[category] ??= []).add(name);
-    }
-    final categories = _activitiesGroupedView ? ({...grouped.keys, ..._activityCategoryNames}.toList()..sort()) : ['__all__'];
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -2273,11 +2263,9 @@ class _MainScreenState extends State<MainScreen> {
         Align(alignment: Alignment.centerLeft, child: OutlinedButton.icon(
           onPressed: _manageActivityCategories, icon: const Icon(Icons.folder_outlined), label: const Text('مدیریت پوشه‌ها'))),
         const Text(
-          'برای مشاهده سوابق، روی فعالیت بزن. فعالیت‌ها را می‌توانی در پوشه‌های مختلف مرتب کنی.',
+          'برای مشاهده سوابق، روی فعالیت بزن. پوشه‌ها فقط برای دسته‌بندی و انتقال فعالیت‌ها استفاده می‌شوند.',
           style: TextStyle(color: Colors.black54, height: 1.6),
         ),
-        const SizedBox(height: 8),
-        SegmentedButton<bool>(segments: const [ButtonSegment<bool>(value: true, label: Text('پوشه‌ای'), icon: Icon(Icons.folder_outlined)), ButtonSegment<bool>(value: false, label: Text('لیستی'), icon: Icon(Icons.list))], selected: {_activitiesGroupedView}, onSelectionChanged: (selection) => setState(() => _activitiesGroupedView = selection.first)),
         const SizedBox(height: 14),
         if (_activityNames.isEmpty)
           const Padding(
@@ -2285,23 +2273,7 @@ class _MainScreenState extends State<MainScreen> {
             child: Center(child: Text('هنوز فعالیتی اضافه نکرده‌ای.')),
           )
         else
-          ...categories.map((category) {
-            final namesInCategory = _activitiesGroupedView ? (grouped[category] ?? const <String>[]) : _activityNames;
-            return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (_activitiesGroupedView) Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 8),
-                child: Row(children: [
-                  Icon(Icons.folder_outlined, size: 19, color: _accentColor),
-                  const SizedBox(width: 7),
-                  Text(category, style: TextStyle(fontWeight: FontWeight.bold, color: _accentColor)),
-                  const SizedBox(width: 8),
-                  Text(_persianDigits(namesInCategory.length.toString()),
-                    style: const TextStyle(color: Colors.black45, fontSize: 12)),
-                ]),
-              ),
-              ...namesInCategory.map((name) => Card(
+          ..._activityNames.map((name) => Card(
                 margin: const EdgeInsets.only(bottom: 9),
                 color: Colors.white,
                 elevation: 0,
@@ -2354,7 +2326,7 @@ class _MainScreenState extends State<MainScreen> {
                           _editActivityName(name);
                         } else if (value == '__delete_activity__') {
                           _deleteActivity(name);
-                        } else if (value == '__new__') {
+                        } else if (value == '__move__') {
                           _setActivityCategory(name);
                         } else {
                           setState(() => _activityCategories[name] = value);
@@ -2366,19 +2338,17 @@ class _MainScreenState extends State<MainScreen> {
                         const PopupMenuItem(value: '__edit_activity__', child: Text('ویرایش نام فعالیت')),
                         const PopupMenuItem(value: '__delete_activity__', child: Text('حذف فعالیت', style: TextStyle(color: Colors.red))),
                         const PopupMenuDivider(),
-                        const PopupMenuItem(value: '__new__', child: Text('انتقال به پوشه')),
-                        const PopupMenuDivider(),
-                        ...categories.where((c) => c != category).map((c) =>
+                        const PopupMenuItem(value: '__move__', child: Text('انتقال به پوشه')),
+                        if (_activityCategoryNames.isNotEmpty) const PopupMenuDivider(),
+                        ..._activityCategoryNames.where((c) => c != (_activityCategories[name] ?? 'بدون پوشه')).map((c) =>
                           PopupMenuItem(value: c, child: Text(c))),
-                        const PopupMenuItem(value: 'بدون پوشه', child: Text('بدون پوشه')),
+                        if ((_activityCategories[name] ?? 'بدون پوشه') != 'بدون پوشه')
+                          const PopupMenuItem(value: 'بدون پوشه', child: Text('حذف از پوشه')),
                       ],
                     ),
                   ]),
                 ),
               )),
-            ],
-          );
-          }),
       ],
     );
   }
