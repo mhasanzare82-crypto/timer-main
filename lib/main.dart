@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -543,6 +544,8 @@ class _MainScreenState extends State<MainScreen> {
   bool _countdownAlarmEnabled = true;
   bool _countdownAlarmSound = true;
   bool _countdownAlarmVibration = true;
+  String? _customAlarmSoundPath;
+  final AudioPlayer _customAlarmPlayer = AudioPlayer();
   Timer? _clock;
   final List<_RunningActivity> _runningActivities = [];
   List<_SavedActivity> _savedActivities = [];
@@ -567,6 +570,7 @@ class _MainScreenState extends State<MainScreen> {
   void dispose() {
     _clock?.cancel();
     _countdownTicker?.cancel();
+    _customAlarmPlayer.dispose();
     for (final activity in _runningActivities) {
       activity.dispose();
     }
@@ -2040,7 +2044,45 @@ class _MainScreenState extends State<MainScreen> {
       _countdownAlarmEnabled = prefs.getBool('countdown_alarm_enabled') ?? true;
       _countdownAlarmSound = prefs.getBool('countdown_alarm_sound') ?? true;
       _countdownAlarmVibration = prefs.getBool('countdown_alarm_vibration') ?? true;
+      _customAlarmSoundPath = prefs.getString('countdown_custom_sound_path');
     });
+  }
+
+  Future<void> _pickCustomAlarmSound() async {
+    final picked = await FilePicker.platform.pickFiles(type: FileType.audio, allowMultiple: false);
+    if (picked == null || picked.files.isEmpty || picked.files.single.path == null) return;
+    try {
+      final sourcePath = picked.files.single.path!;
+      final dir = await getApplicationSupportDirectory();
+      final fileName = sourcePath.split(RegExp(r'[/\\]')).last;
+      final saved = await File(sourcePath).copy('${dir.path}/timer_alarm_${DateTime.now().millisecondsSinceEpoch}_$fileName');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('countdown_custom_sound_path', saved.path);
+      if (!mounted) return;
+      setState(() => _customAlarmSoundPath = saved.path);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('صدای هشدار انتخاب شد. برای آزمایش، دکمه پخش را بزن.'));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ذخیره فایل صدا انجام نشد. دوباره تلاش کن.')));
+    }
+  }
+  Future<void> _clearCustomAlarmSound() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('countdown_custom_sound_path');
+    if (!mounted) return;
+    setState(() => _customAlarmSoundPath = null);
+  }
+  Future<void> _previewCustomAlarmSound() async {
+    final path = _customAlarmSoundPath;
+    if (path == null || !File(path).existsSync()) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ابتدا یک فایل صدا انتخاب کن.')));
+      return;
+    }
+    try {
+      await _customAlarmPlayer.stop();
+      await _customAlarmPlayer.play(DeviceFileSource(path));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('پخش این فایل صدا ممکن نشد.')));
+    }
   }
 
   Future<void> _saveCountdownAlarmSettings() async {
@@ -2085,7 +2127,13 @@ class _MainScreenState extends State<MainScreen> {
     await _notifications.cancel(item.id);
     if (_countdownAlarmEnabled) {
       await _notifications.show(item.id,'پایان تایمر','زمان «'+item.title+'» به پایان رسید.',_alarmDetails,payload:'countdown:'+item.id.toString());
-      if (_countdownAlarmSound) SystemSound.play(SystemSoundType.alert);
+      if (_countdownAlarmSound) {
+        final customPath = _customAlarmSoundPath;
+        if (customPath != null && File(customPath).existsSync()) {
+          try { await _customAlarmPlayer.stop(); await _customAlarmPlayer.play(DeviceFileSource(customPath)); }
+          catch (_) { SystemSound.play(SystemSoundType.alert); }
+        } else { SystemSound.play(SystemSoundType.alert); }
+      }
     }
   }
   Future<void> _addCountdown() async {
@@ -2196,6 +2244,26 @@ class _MainScreenState extends State<MainScreen> {
                   secondary:const Icon(Icons.volume_up_outlined),
                   value:_countdownAlarmSound, activeColor:_accentColor,
                   onChanged:(v) async { setState(()=>_countdownAlarmSound=v); await _saveCountdownAlarmSettings(); },
+                ),
+                if (_countdownAlarmSound) Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 8, 4, 12),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Expanded(child: Text(_customAlarmSoundPath == null ? 'صدای پیش‌فرض گوشی' : 'فایل صدای اختصاصی انتخاب شده', style: const TextStyle(fontSize: 13))),
+                      if (_customAlarmSoundPath != null) IconButton(tooltip: 'پخش آزمایشی', onPressed: _previewCustomAlarmSound, icon: const Icon(Icons.play_circle_outline)),
+                    ]),
+                    SizedBox(width: double.infinity, child: OutlinedButton.icon(
+                      onPressed: _pickCustomAlarmSound,
+                      icon: const Icon(Icons.folder_open),
+                      label: const Text('انتخاب زنگ از حافظه گوشی'),
+                    )),
+                    if (_customAlarmSoundPath != null) SizedBox(width: double.infinity, child: TextButton.icon(
+                      onPressed: _clearCustomAlarmSound,
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('حذف زنگ انتخاب‌شده و بازگشت به پیش‌فرض'),
+                    )),
+                    const Text('صدای سفارشی هنگام فعال بودن خود برنامه پخش می‌شود؛ در پس‌زمینه/بسته بودن برنامه اعلان از صدای پیش‌فرض سیستم استفاده می‌کند.', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                  ]),
                 ),
                 SwitchListTile(
                   contentPadding:EdgeInsets.zero, title:const Text('لرزش هنگام هشدار'),
