@@ -216,12 +216,19 @@ class _BiometricGateState extends State<_BiometricGate>
                       style: const TextStyle(color: Colors.redAccent)),
                 ],
                 const SizedBox(height: 14),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('قفل بیومتریک', style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(_biometricLockEnabled ? 'فعال — ورود با اثر انگشت لازم است' : 'غیرفعال — ورود بدون اثر انگشت'),
-                  value: _biometricLockEnabled,
-                  onChanged: _busy ? null : _setLockEnabled,
+                SizedBox(
+                  width: double.infinity,
+                  child: _biometricLockEnabled
+                      ? FilledButton.icon(
+                          onPressed: _busy ? null : () => _setLockEnabled(false),
+                          icon: const Icon(Icons.lock),
+                          label: const Text('قفل فعال'),
+                        )
+                      : OutlinedButton.icon(
+                          onPressed: _busy ? null : () => _setLockEnabled(true),
+                          icon: const Icon(Icons.lock_open),
+                          label: const Text('قفل غیرفعال'),
+                        ),
                 ),
                 const SizedBox(height: 22),
                 FilledButton.icon(
