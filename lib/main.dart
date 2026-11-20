@@ -1737,7 +1737,7 @@ class _MainScreenState extends State<MainScreen> {
     final dir = await getTemporaryDirectory();
     final file = File(dir.path + '/time_report_' + DateTime.now().millisecondsSinceEpoch.toString() + '.xlsx');
     await file.writeAsBytes(bytes, flush: true);
-    await Share.shareXFiles([XFile(file.path)], text: 'گزارش زمان فعالیت‌ها');
+    await SharePlus.instance.share(ShareParams(files: [XFile(file.path)], text: 'گزارش زمان فعالیت‌ها'));
   }
 
   Future<void> _showReportActivityPicker() async {
