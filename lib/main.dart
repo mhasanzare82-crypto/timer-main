@@ -67,6 +67,7 @@ class _BiometricGateState extends State<_BiometricGate>
     with WidgetsBindingObserver {
   final LocalAuthentication _auth = LocalAuthentication();
   bool _unlocked = false;
+  bool _biometricLockEnabled = true;
   bool _busy = false;
   bool _needsAuthentication = true;
   String? _error;
@@ -75,8 +76,39 @@ class _BiometricGateState extends State<_BiometricGate>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _authenticate());
+    _loadLockSetting();
   }
+
+  Future<void> _loadLockSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool('biometric_lock_enabled') ?? true;
+    if (!mounted) return;
+    setState(() {
+      _biometricLockEnabled = enabled;
+      _unlocked = !enabled;
+      _needsAuthentication = enabled;
+    });
+    if (enabled) _authenticate();
+  }
+
+  Future<void> _setLockEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('biometric_lock_enabled', enabled);
+    if (!mounted) return;
+    setState(() {
+      _biometricLockEnabled = enabled;
+      if (!enabled) {
+        _unlocked = true;
+        _needsAuthentication = false;
+        _error = null;
+      } else {
+        _unlocked = false;
+        _needsAuthentication = true;
+      }
+    });
+    if (enabled) _authenticate();
+  }
+
 
   @override
   void dispose() {
@@ -102,7 +134,7 @@ class _BiometricGateState extends State<_BiometricGate>
   }
 
   Future<void> _authenticate() async {
-    if (_busy || !mounted) return;
+    if (_busy || !mounted || !_biometricLockEnabled) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -156,7 +188,7 @@ class _BiometricGateState extends State<_BiometricGate>
 
   @override
   Widget build(BuildContext context) {
-    if (_unlocked) return widget.child;
+    if (!_biometricLockEnabled || _unlocked) return widget.child;
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FC),
       body: SafeArea(
@@ -183,6 +215,14 @@ class _BiometricGateState extends State<_BiometricGate>
                   Text(_error!, textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.redAccent)),
                 ],
+                const SizedBox(height: 14),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('قفل بیومتریک', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(_biometricLockEnabled ? 'فعال — ورود با اثر انگشت لازم است' : 'غیرفعال — ورود بدون اثر انگشت'),
+                  value: _biometricLockEnabled,
+                  onChanged: _busy ? null : _setLockEnabled,
+                ),
                 const SizedBox(height: 22),
                 FilledButton.icon(
                   onPressed: _busy ? null : _authenticate,
