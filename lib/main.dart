@@ -691,10 +691,35 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _setActivityCategory(String name) async {
     final current = _activityCategories[name] ?? 'بدون پوشه';
-    final category = await _askChecklistText(
-      title: 'پوشه فعالیت',
-      hint: 'مثلاً کار، یادگیری، سلامتی',
-      initial: current == 'بدون پوشه' ? '' : current,
+    final category = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('انتقال به پوشه'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: _activityCategoryNames.isEmpty
+              ? const Text('هنوز پوشه‌ای ایجاد نشده است. ابتدا از «مدیریت پوشه‌ها» یک پوشه بساز.')
+              : ListView(
+                  shrinkWrap: true,
+                  children: [
+                    ..._activityCategoryNames.map((folder) => ListTile(
+                      leading: const Icon(Icons.folder_outlined),
+                      title: Text(folder),
+                      trailing: current == folder ? const Icon(Icons.check, color: Colors.green) : null,
+                      onTap: () => Navigator.pop(ctx, folder),
+                    )),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.folder_off_outlined),
+                      title: const Text('بدون پوشه'),
+                      trailing: current == 'بدون پوشه' ? const Icon(Icons.check, color: Colors.green) : null,
+                      onTap: () => Navigator.pop(ctx, 'بدون پوشه'),
+                    ),
+                  ],
+                ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف'))],
+      ),
     );
     if (category == null || !mounted) return;
     setState(() => _activityCategories[name] = category);
@@ -2407,11 +2432,6 @@ class _MainScreenState extends State<MainScreen> {
                         const PopupMenuItem(value: '__delete_activity__', child: Text('حذف فعالیت', style: TextStyle(color: Colors.red))),
                         const PopupMenuDivider(),
                         const PopupMenuItem(value: '__move__', child: Text('انتقال به پوشه')),
-                        if (_activityCategoryNames.isNotEmpty) const PopupMenuDivider(),
-                        ..._activityCategoryNames.where((c) => c != (_activityCategories[name] ?? 'بدون پوشه')).map((c) =>
-                          PopupMenuItem(value: c, child: Text(c))),
-                        if ((_activityCategories[name] ?? 'بدون پوشه') != 'بدون پوشه')
-                          const PopupMenuItem(value: 'بدون پوشه', child: Text('حذف از پوشه')),
                       ],
                     ),
                   ]),
