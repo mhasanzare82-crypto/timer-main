@@ -2352,7 +2352,7 @@ class _MainScreenState extends State<MainScreen> {
                         )),
                       ]);
                     }),
-                    Text(_durationText(Duration(seconds: (_runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull?.stopwatch.elapsed.inSeconds ?? 0) + (totalByName[name] ?? 0))),
+                    Text(_durationText(Duration(seconds: _runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull?.stopwatch.elapsed.inSeconds ?? 0)),
                       textDirection: TextDirection.ltr,
                       style: TextStyle(color: _accentColor, fontWeight: FontWeight.bold)),
                     PopupMenuButton<String>(
