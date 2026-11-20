@@ -49,15 +49,14 @@ class TimerApp extends StatelessWidget {
         textDirection: TextDirection.rtl,
         child: child!,
       ),
-      home: const _BiometricGate(child: MainScreen()),
+      home: const _BiometricGate(),
     );
   }
 }
 
 
 class _BiometricGate extends StatefulWidget {
-  final Widget child;
-  const _BiometricGate({required this.child});
+  const _BiometricGate();
 
   @override
   State<_BiometricGate> createState() => _BiometricGateState();
@@ -188,7 +187,12 @@ class _BiometricGateState extends State<_BiometricGate>
 
   @override
   Widget build(BuildContext context) {
-    if (!_biometricLockEnabled || _unlocked) return widget.child;
+    if (!_biometricLockEnabled || _unlocked) {
+      return MainScreen(
+        biometricLockEnabled: _biometricLockEnabled,
+        onToggleBiometricLock: _setLockEnabled,
+      );
+    }
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FC),
       body: SafeArea(
@@ -498,7 +502,9 @@ class _ActivityDetailPageState extends State<_ActivityDetailPage> {
 }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final bool biometricLockEnabled;
+  final Future<void> Function(bool) onToggleBiometricLock;
+  const MainScreen({super.key, required this.biometricLockEnabled, required this.onToggleBiometricLock});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -997,8 +1003,7 @@ class _MainScreenState extends State<MainScreen> {
             hintText: 'مثلاً مطالعه یا ورزش',
             border: OutlineInputBorder(),
           ),
-          onSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),        ),
-        actions: [
+          onSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),        ),        actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('انصراف')),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
@@ -1297,6 +1302,12 @@ class _MainScreenState extends State<MainScreen> {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
+          IconButton(
+            tooltip: widget.biometricLockEnabled ? 'غیرفعال کردن قفل برنامه' : 'فعال کردن قفل برنامه',
+            onPressed: () => widget.onToggleBiometricLock(!widget.biometricLockEnabled),
+            icon: Icon(widget.biometricLockEnabled ? Icons.lock_rounded : Icons.lock_open_rounded),
+            color: widget.biometricLockEnabled ? _accentColor : Colors.black45,
+          ),
           IconButton(
             tooltip: 'گزارش‌گیری',
             onPressed: () => setState(() => _selectedIndex = 2),
@@ -1997,8 +2008,7 @@ class _MainScreenState extends State<MainScreen> {
         jsonEncode(_countdowns.map((item) => item.toJson()).toList()));
   }
 
-  Future<void> _restoreCountdowns() async {
-    final prefs = await SharedPreferences.getInstance();
+  Future<void> _restoreCountdowns() async {    final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_countdownsStorageKey);
     if (raw == null) return;
     try {
