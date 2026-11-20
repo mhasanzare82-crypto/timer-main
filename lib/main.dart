@@ -2316,7 +2316,7 @@ class _MainScreenState extends State<MainScreen> {
                         icon: Icon(isRunning ? Icons.pause_circle_filled : Icons.play_circle_fill, color: _accentColor),
                       );
                     }),
-                    Text(_durationText(Duration(seconds: totalByName[name] ?? 0)),
+                    Text(_durationText(Duration(seconds: (_runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull?.stopwatch.elapsed.inSeconds ?? 0) + (totalByName[name] ?? 0))),
                       textDirection: TextDirection.ltr,
                       style: TextStyle(color: _accentColor, fontWeight: FontWeight.bold)),
                     PopupMenuButton<String>(
