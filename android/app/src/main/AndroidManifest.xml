@@ -6,7 +6,7 @@
     <application
         android:label="Timer"
         android:name="${applicationName}"
-        android:icon="@drawable/ic_timer_launcher">
+        android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
             android:exported="true"
