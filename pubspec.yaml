@@ -15,7 +15,7 @@ dependencies:
   shared_preferences: ^2.5.3
   local_auth: ^3.0.2
   excel: ^4.0.6
-  file_picker: ^10.1.2
+  file_picker: ^11.0.3
   path_provider: ^2.1.5
   share_plus: ^11.0.0
   flutter_local_notifications: ^19.4.2
