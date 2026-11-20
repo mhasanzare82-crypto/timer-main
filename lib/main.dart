@@ -521,6 +521,7 @@ class _MainScreenState extends State<MainScreen> {
   ];
 
   int _selectedIndex = 0;
+  bool _activitiesGroupedView = true;
   Color _accentColor = _colors.first;
   DateTime _now = DateTime.now();
   static const _clockOffsetStorageKey = 'program_clock_offset_minutes_v1';
@@ -2240,7 +2241,7 @@ class _MainScreenState extends State<MainScreen> {
       final category = _activityCategories[name] ?? 'بدون پوشه';
       (grouped[category] ??= []).add(name);
     }
-    final categories = {...grouped.keys, ..._activityCategoryNames}.toList()..sort();
+    final categories = _activitiesGroupedView ? ({...grouped.keys, ..._activityCategoryNames}.toList()..sort()) : ['__all__'];
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -2270,11 +2271,11 @@ class _MainScreenState extends State<MainScreen> {
           )
         else
           ...categories.map((category) {
-            final namesInCategory = grouped[category] ?? const <String>[];
+            final namesInCategory = _activitiesGroupedView ? (grouped[category] ?? const <String>[]) : _activityNames;
             return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Padding(
+              if (_activitiesGroupedView) Padding(
                 padding: const EdgeInsets.only(top: 8, bottom: 8),
                 child: Row(children: [
                   Icon(Icons.folder_outlined, size: 19, color: _accentColor),
@@ -2297,8 +2298,9 @@ class _MainScreenState extends State<MainScreen> {
                   onTap: () => _openActivityDetails(name),
                   leading: Icon(Icons.label_outline_rounded, color: _accentColor),
                   title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text('مشاهده تمام دفعات ثبت‌شده'),
+                  subtitle: Text(_activitiesGroupedView ? 'مشاهده تمام دفعات ثبت‌شده' : 'مشاهده تاریخچه'),
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    IconButton(tooltip: 'شروع تایمر', onPressed: () => _startNewActivity(name), icon: Icon(Icons.play_circle_fill, color: _accentColor)),
                     Text(_durationText(Duration(seconds: totalByName[name] ?? 0)),
                       textDirection: TextDirection.ltr,
                       style: TextStyle(color: _accentColor, fontWeight: FontWeight.bold)),
