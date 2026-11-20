@@ -1253,6 +1253,11 @@ class _MainScreenState extends State<MainScreen> {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
+          IconButton(
+            tooltip: 'گزارش‌گیری',
+            onPressed: () => setState(() => _selectedIndex = 2),
+            icon: Icon(_selectedIndex == 2 ? Icons.bar_chart_rounded : Icons.bar_chart_outlined),
+          ),
           if (_selectedIndex == 0) ...[
             IconButton(
               tooltip: 'تنظیم ساعت برنامه',
@@ -1287,8 +1292,8 @@ class _MainScreenState extends State<MainScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
+        selectedIndex: _selectedIndex == 2 ? -1 : (_selectedIndex == 3 ? 2 : _selectedIndex),
+        onDestinationSelected: (index) => setState(() => _selectedIndex = index == 2 ? 3 : index),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.add_circle_outline_rounded),
@@ -1299,11 +1304,6 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.checklist_outlined),
             selectedIcon: Icon(Icons.checklist_rounded),
             label: 'فعالیت‌ها',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.bar_chart_outlined),
-            selectedIcon: Icon(Icons.bar_chart_rounded),
-            label: 'گزارش‌گیری',
           ),
           NavigationDestination(
             icon: Icon(Icons.hourglass_bottom_rounded),
