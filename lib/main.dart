@@ -2317,7 +2317,7 @@ class _MainScreenState extends State<MainScreen> {
                   title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
                   subtitle: Builder(builder: (context) {
                     final current = _runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull;
-                    final status = current == null ? 'آماده شروع • مشاهده سوابق' : current.stopwatch.isRunning ? '● در حال اجرا • زمان زنده' : 'مکث شده • برای ادامه شروع را بزن';
+                    final status = current == null ? 'آماده شروع • مشاهده سوابق' : current.stopwatch.isRunning ? '● در حال اجرا' : 'مکث شده • برای ادامه شروع را بزن';
                     return Text(status, style: TextStyle(color: current?.stopwatch.isRunning == true ? Colors.green : Colors.black54, fontSize: 12));
                   }),
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
