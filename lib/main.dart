@@ -2310,6 +2310,8 @@ class _MainScreenState extends State<MainScreen> {
                   side: const BorderSide(color: Color(0xFFE8EAF0)),
                 ),
                 child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  minLeadingWidth: 28,
                   onTap: () => _openActivityDetails(name),
                   leading: Icon(Icons.label_outline_rounded, color: _accentColor),
                   title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -2321,28 +2323,28 @@ class _MainScreenState extends State<MainScreen> {
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                     Builder(builder: (context) {
                       final active = _runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull;
-                      const buttonSize = 28.0;
+                      const buttonSize = 36.0;
                       return Row(mainAxisSize: MainAxisSize.min, children: [
                         SizedBox(width: buttonSize, height: buttonSize, child: IconButton(
                           padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: buttonSize, height: buttonSize),
                           tooltip: 'شروع', onPressed: active == null ? () => _startNewActivity(name) : () => _startActivity(active),
-                          icon: Icon(Icons.play_arrow_rounded, size: 18, color: _accentColor),
+                          icon: Icon(Icons.play_arrow_rounded, size: 23, color: _accentColor),
                         )),
                         SizedBox(width: buttonSize, height: buttonSize, child: IconButton(
                           padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: buttonSize, height: buttonSize),
                           tooltip: 'مکث', onPressed: active == null ? null : () => _pauseActivity(active),
-                          icon: Icon(Icons.pause_rounded, size: 18, color: _accentColor),
+                          icon: Icon(Icons.pause_rounded, size: 23, color: _accentColor),
                         )),
                         SizedBox(width: buttonSize, height: buttonSize, child: IconButton(
                           padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: buttonSize, height: buttonSize),
                           tooltip: 'پایان و ثبت', onPressed: active == null ? null : () => _stopActivity(active),
-                          icon: Icon(Icons.stop_rounded, size: 18, color: Colors.redAccent),
+                          icon: Icon(Icons.stop_rounded, size: 23, color: Colors.redAccent),
                         )),
                       ]);
                     }),
                     Text(_durationText(Duration(seconds: _runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull?.stopwatch.elapsed.inSeconds ?? 0)),
                       textDirection: TextDirection.ltr,
-                      style: TextStyle(color: _accentColor, fontWeight: FontWeight.bold)),
+                      style: TextStyle(color: _accentColor, fontWeight: FontWeight.bold, fontSize: 15)),
                     PopupMenuButton<String>(
                       tooltip: 'مدیریت فعالیت',
                       onSelected: (value) {
