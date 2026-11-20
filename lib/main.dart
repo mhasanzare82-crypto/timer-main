@@ -2074,10 +2074,10 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _pickCustomAlarmSound() async {
-    final picked = await FilePicker.platform.pickFiles(type: FileType.audio, allowMultiple: false);
-    if (picked == null || picked.files.isEmpty || picked.files.single.path == null) return;
+    final picked = await FilePicker.pickFile(type: FileType.audio);
+    if (picked == null || picked.path == null) return;
     try {
-      final sourcePath = picked.files.single.path!;
+      final sourcePath = picked.path!;
       final dir = await getApplicationSupportDirectory();
       final fileName = sourcePath.split(RegExp(r'[/\\]')).last;
       final saved = await File(sourcePath).copy('${dir.path}/timer_alarm_${DateTime.now().millisecondsSinceEpoch}_$fileName');
@@ -2085,7 +2085,7 @@ class _MainScreenState extends State<MainScreen> {
       await prefs.setString('countdown_custom_sound_path', saved.path);
       if (!mounted) return;
       setState(() => _customAlarmSoundPath = saved.path);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('صدای هشدار انتخاب شد. برای آزمایش، دکمه پخش را بزن.'));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('صدای هشدار انتخاب شد. برای آزمایش، دکمه پخش را بزن.')));
     } catch (_) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ذخیره فایل صدا انجام نشد. دوباره تلاش کن.')));
     }
