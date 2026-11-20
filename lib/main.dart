@@ -349,39 +349,6 @@ class _CountdownTimer {
 }
 
 
-class _ChecklistItem {
-  String title;
-  bool done;
-  List<Map<String, dynamic>> history;
-  _ChecklistItem({required this.title, this.done = false, List<Map<String, dynamic>>? history})
-      : history = history ?? [];
-  Map<String, dynamic> toJson() => {'title': title, 'done': done, 'history': history};
-  factory _ChecklistItem.fromJson(Map<String, dynamic> json) => _ChecklistItem(
-    title: json['title'] as String? ?? '',
-    done: json['done'] as bool? ?? false,
-    history: (json['history'] as List<dynamic>? ?? [])
-      .map((e) => Map<String, dynamic>.from(e as Map)).toList(),
-  );
-}
-
-class _Checklist {
-  final String id;
-  String title;
-  final List<_ChecklistItem> items;
-  _Checklist({required this.id, required this.title, List<_ChecklistItem>? items})
-      : items = items ?? [];
-  Map<String, dynamic> toJson() => {
-    'id': id, 'title': title, 'items': items.map((e) => e.toJson()).toList(),
-  };
-  factory _Checklist.fromJson(Map<String, dynamic> json) => _Checklist(
-    id: json['id'] as String? ?? DateTime.now().microsecondsSinceEpoch.toString(),
-    title: json['title'] as String? ?? 'چک‌لیست',
-    items: (json['items'] as List<dynamic>? ?? [])
-      .map((e) => _ChecklistItem.fromJson(Map<String, dynamic>.from(e as Map))).toList(),
-  );
-}
-
-
 class _ActivityDetailPage extends StatefulWidget {
   final String name;
   final List<_SavedActivity> sessions;
@@ -493,11 +460,10 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   static const _storageKey = 'completed_activities_jalali_v1';
   static const _namesStorageKey = 'activity_names_v1';
-  static const _checklistsStorageKey = 'checklists_v1';
   static const _categoriesStorageKey = 'activity_categories_v1';
   static const _runningActivitiesStorageKey = 'running_activities_v1';
   static const _countdownsStorageKey = 'countdown_timers_v1';
-  static const _tabTitles = ['ثبت زمان', 'فعالیت‌ها', 'گزارش‌گیری', 'تایمر معکوس', 'چک‌لیست‌ها'];
+  static const _tabTitles = ['ثبت زمان', 'فعالیت‌ها', 'گزارش‌گیری', 'تایمر معکوس'];
   static const _colors = [
     Color(0xFF356AE6),
     Color(0xFF00897B),
@@ -529,17 +495,6 @@ class _MainScreenState extends State<MainScreen> {
   List<String> _activityNames = [];
   Map<String, String> _activityCategories = {};
   List<String> _activityCategoryNames = [];
-  List<_Checklist> _checklists = [];
-  static const _checklistItemFontSizeKey = 'checklist_item_font_size_v1';
-  static const _checklistTitleFontSizeKey = 'checklist_title_font_size_v1';
-  static const _checklistItemFontPathKey = 'checklist_item_font_path_v1';
-  static const _checklistTitleFontPathKey = 'checklist_title_font_path_v1';
-  static const _checklistItemFontFamilyKey = 'checklist_item_font_family_v1';
-  static const _checklistTitleFontFamilyKey = 'checklist_title_font_family_v1';
-  double _checklistItemFontSize = 15;
-  double _checklistTitleFontSize = 16;
-  String? _checklistItemFontFamily;
-  String? _checklistTitleFontFamily;
 
   @override
   void initState() {
@@ -549,8 +504,7 @@ class _MainScreenState extends State<MainScreen> {
     });
     _loadProgramClockSettings();
     _initializeData();
-    _loadChecklists();
-    _loadChecklistTypographySettings();
+    _clearRemovedChecklistData();
     _initializeAlarmNotifications();
     _countdownTicker=Timer.periodic(const Duration(seconds:1), (_) => _tickCountdowns());
   }
@@ -1269,17 +1223,6 @@ class _MainScreenState extends State<MainScreen> {
               icon: const Icon(Icons.palette_outlined),
             ),
           ],
-          if (_selectedIndex == 4) ...[
-            IconButton(tooltip: 'چک‌لیست جدید', onPressed: _addChecklist, icon: const Icon(Icons.add_task_rounded)),
-            IconButton(tooltip: 'ساخت چک‌لیست از متن', onPressed: _createChecklistFromMultilineText, icon: const Icon(Icons.edit_note_rounded)),
-            IconButton(tooltip: 'ورود از فایل اکسل', onPressed: _importChecklistExcel, icon: const Icon(Icons.file_open_outlined)),
-            IconButton(tooltip: 'ورود از فایل TXT', onPressed: _importChecklistTxt, icon: const Icon(Icons.upload_file_rounded)),
-            IconButton(tooltip: 'خروجی اکسل یک چک‌لیست', onPressed: _chooseChecklistForExcelExport, icon: const Icon(Icons.table_view_outlined)),
-            IconButton(tooltip: 'خروجی همه چک‌لیست‌ها (TXT)', onPressed: _exportChecklistsTxt, icon: const Icon(Icons.text_snippet_outlined)),
-            IconButton(tooltip: 'تهیه پشتیبان', onPressed: _backupChecklists, icon: const Icon(Icons.backup_outlined)),
-            IconButton(tooltip: 'بازیابی پشتیبان', onPressed: _restoreChecklistsBackup, icon: const Icon(Icons.settings_backup_restore_rounded)),
-            IconButton(tooltip: 'تنظیم اندازه و فونت', onPressed: _showChecklistTypographySettings, icon: const Icon(Icons.text_fields_rounded)),
-          ],
         ],
       ),
       body: IndexedStack(
@@ -1289,7 +1232,6 @@ class _MainScreenState extends State<MainScreen> {
           _buildActivitiesPage(),
           _buildReportsPage(),
           _buildCountdownPage(),
-          _buildChecklistsPage(),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -1320,11 +1262,6 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.hourglass_bottom_rounded),
             selectedIcon: Icon(Icons.hourglass_full_rounded),
             label: 'تایمر معکوس',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.fact_check_outlined),
-            selectedIcon: Icon(Icons.fact_check_rounded),
-            label: 'چک‌لیست‌ها',
           ),
         ],
       ),
@@ -1879,7 +1816,6 @@ class _MainScreenState extends State<MainScreen> {
       'savedActivities': _savedActivities.map((a) => a.toJson()).toList(),
       'activityCategories': _activityCategories,
       'activityCategoryNames': _activityCategoryNames,
-      'checklists': _checklists.map((a) => a.toJson()).toList(),
     });
     final path = await FilePicker.platform.saveFile(
       dialogTitle: 'ذخیره فایل پشتیبان',
@@ -1904,7 +1840,6 @@ class _MainScreenState extends State<MainScreen> {
       );
       final restoredCategoryNames = (data['activityCategoryNames'] as List<dynamic>? ?? [])
           .map((e) => e.toString()).toSet().toList()..sort();
-      final restoredChecklists = (data['checklists'] as List<dynamic>? ?? []).map((e) => _Checklist.fromJson(Map<String, dynamic>.from(e as Map))).toList();
       final yes = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
         title: const Text('بازیابی اطلاعات'),
         content: const Text('اطلاعات فعلی با فایل پشتیبان جایگزین می‌شود. ادامه می‌دهی؟'),
@@ -1919,7 +1854,6 @@ class _MainScreenState extends State<MainScreen> {
         _savedActivities = saved;
         _activityCategories = restoredCategories;
         _activityCategoryNames = restoredCategoryNames;
-        _checklists = restoredChecklists;
         _runningActivities.clear();
       });
       final prefs = await SharedPreferences.getInstance();
@@ -1927,7 +1861,6 @@ class _MainScreenState extends State<MainScreen> {
       await prefs.setString(_storageKey, jsonEncode(_savedActivities.map((a) => a.toJson()).toList()));
       await prefs.setString(_categoriesStorageKey, jsonEncode(_activityCategories));
       await prefs.setStringList('activity_category_names_v1', _activityCategoryNames);
-      await prefs.setString(_checklistsStorageKey, jsonEncode(_checklists.map((a) => a.toJson()).toList()));
       await prefs.setString(_runningActivitiesStorageKey, jsonEncode(<dynamic>[]));
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('بازیابی انجام شد.')));
     } catch (e) {
@@ -1937,629 +1870,19 @@ class _MainScreenState extends State<MainScreen> {
 
 
 
-  Future<void> _loadChecklists() async {
+  Future<void> _clearRemovedChecklistData() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_checklistsStorageKey);
-    if (raw == null) return;
-    try {
-      final data = jsonDecode(raw) as List<dynamic>;
-      if (!mounted) return;
-      setState(() => _checklists = data.map((e) =>
-        _Checklist.fromJson(Map<String, dynamic>.from(e as Map))).toList());
-    } catch (_) {
-      // Ignore invalid local checklist data.
+    for (final key in [
+      'checklists_v1',
+      'checklist_item_font_size_v1',
+      'checklist_title_font_size_v1',
+      'checklist_item_font_path_v1',
+      'checklist_title_font_path_v1',
+      'checklist_item_font_family_v1',
+      'checklist_title_font_family_v1',
+    ]) {
+      await prefs.remove(key);
     }
-  }
-
-  Future<void> _persistChecklists() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_checklistsStorageKey,
-      jsonEncode(_checklists.map((e) => e.toJson()).toList()));
-  }
-
-  Future<void> _exportChecklistsTxt() async {
-    if (_checklists.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('چک‌لیستی برای خروجی وجود ندارد.')));
-      return;
-    }
-    final buffer = StringBuffer('گزارش چک‌لیست‌ها\n====================\n');
-    for (final list in _checklists) {
-      buffer.writeln('\n${list.title}');
-      buffer.writeln('------------------------------');
-      for (final item in list.items) {
-        buffer.writeln('[${item.done ? '✓ انجام‌شده' : '✗ انجام‌نشده'}] ${item.title}');
-        for (final event in item.history) {
-          final at = DateTime.tryParse(event['at']?.toString() ?? '');
-          if (at != null) buffer.writeln('  ${event['done'] == true ? 'انجام شد' : 'انجام‌نشده شد'}: ${_jalaliDate(at)} ${_clockTime(at)}');
-        }
-      }
-    }
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/checklists_${DateTime.now().millisecondsSinceEpoch}.txt');
-    await file.writeAsString(buffer.toString(), encoding: utf8, flush: true);
-    await Share.shareXFiles([XFile(file.path)], text: 'خروجی چک‌لیست‌ها');
-  }
-
-  Future<void> _chooseChecklistForExcelExport() async {
-    if (_checklists.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('چک‌لیستی برای خروجی وجود ندارد.')),
-      );
-      return;
-    }
-    final selected = await showDialog<_Checklist>(
-      context: context,
-      builder: (ctx) => SimpleDialog(
-        title: const Text('انتخاب چک‌لیست برای خروجی اکسل'),
-        children: _checklists.map((list) => SimpleDialogOption(
-          onPressed: () => Navigator.pop(ctx, list),
-          child: Text(list.title),
-        )).toList(),
-      ),
-    );
-    if (selected != null && mounted) await _exportChecklistExcel(selected);
-  }
-  Future<void> _exportChecklistExcel(_Checklist list) async {
-    if (list.items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('این چک‌لیست هنوز موردی ندارد.')),
-      );
-      return;
-    }
-
-    final exportedAt = DateTime.now();
-    final book = Excel.createExcel();
-
-    // وضعیت فعلی همه موارد، شامل موارد تیک‌خورده و تیک‌نخورده.
-    final current = book['وضعیت فعلی'];
-    current.appendRow([
-      TextCellValue('نام چک‌لیست'),
-      TextCellValue('مورد'),
-      TextCellValue('وضعیت'),
-      TextCellValue('تاریخ آخرین تغییر / تهیه گزارش'),
-      TextCellValue('ساعت آخرین تغییر / تهیه گزارش'),
-    ]);
-    for (final item in list.items) {
-      final lastChange = item.history.isEmpty
-          ? exportedAt
-          : (DateTime.tryParse(item.history.last['at']?.toString() ?? '') ?? exportedAt);
-      current.appendRow([
-        TextCellValue(list.title),
-        TextCellValue(item.title),
-        TextCellValue(item.done ? 'انجام‌شده' : 'انجام‌نشده'),
-        TextCellValue(_jalaliDate(lastChange)),
-        TextCellValue(_clockTime(lastChange)),
-      ]);
-    }
-
-    // تمام دفعات تیک‌زدن و برداشتن تیک، با زمان دقیق هر تغییر.
-    final history = book['تاریخچه تغییرات'];
-    history.appendRow([
-      TextCellValue('نام چک‌لیست'),
-      TextCellValue('مورد'),
-      TextCellValue('وضعیت ثبت‌شده'),
-      TextCellValue('تاریخ تغییر'),
-      TextCellValue('ساعت تغییر'),
-    ]);
-    for (final item in list.items) {
-      for (final event in item.history) {
-        final at = DateTime.tryParse(event['at']?.toString() ?? '');
-        if (at == null) continue;
-        final done = event['done'] == true;
-        history.appendRow([
-          TextCellValue(list.title),
-          TextCellValue(item.title),
-          TextCellValue(done ? 'تیک زده شد' : 'تیک برداشته شد'),
-          TextCellValue(_jalaliDate(at)),
-          TextCellValue(_clockTime(at)),
-        ]);
-      }
-    }
-
-    final bytes = book.encode();
-    if (bytes == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ساخت فایل اکسل ناموفق بود.')),
-      );
-      return;
-    }
-
-    final safeName = list.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-    final path = await FilePicker.platform.saveFile(
-      dialogTitle: 'ذخیره گزارش اکسل چک‌لیست',
-      fileName: 'checklist_${safeName}_${exportedAt.millisecondsSinceEpoch}.xlsx',
-      type: FileType.custom,
-      allowedExtensions: ['xlsx'],
-      bytes: Uint8List.fromList(bytes),
-    );
-    if (path != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('گزارش اکسل چک‌لیست ذخیره شد.')),
-      );
-    }
-  }
-
-  Future<void> _backupChecklists() async {
-    final content = const JsonEncoder.withIndent('  ').convert({
-      'format': 'timer_main_checklists_backup',
-      'version': 1,
-      'createdAt': DateTime.now().toIso8601String(),
-      'checklists': _checklists.map((e) => e.toJson()).toList(),
-    });
-    final path = await FilePicker.platform.saveFile(
-      dialogTitle: 'ذخیره پشتیبان چک‌لیست‌ها',
-      fileName: 'checklists_backup.json',
-      type: FileType.custom,
-      allowedExtensions: ['json'],
-      bytes: utf8.encode(content),
-    );
-    if (path != null && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('پشتیبان چک‌لیست‌ها ذخیره شد.')));
-  }
-
-  Future<void> _restoreChecklistsBackup() async {
-    final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['json'], withData: true);
-    if (picked == null || picked.files.single.bytes == null || !mounted) return;
-    try {
-      final data = jsonDecode(utf8.decode(picked.files.single.bytes!)) as Map<String, dynamic>;
-      if (data['format'] != 'timer_main_checklists_backup' || data['version'] != 1) throw const FormatException('این فایل، پشتیبان معتبر چک‌لیست‌ها نیست.');
-      final restored = (data['checklists'] as List<dynamic>).map((e) => _Checklist.fromJson(Map<String, dynamic>.from(e as Map))).toList();
-      final confirm = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-        title: const Text('بازیابی پشتیبان چک‌لیست‌ها'),
-        content: const Text('چک‌لیست‌های فعلی با اطلاعات فایل پشتیبان جایگزین می‌شوند. ادامه می‌دهی؟'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('بازیابی')),
-        ],
-      ));
-      if (confirm != true || !mounted) return;
-      setState(() => _checklists = restored);
-      await _persistChecklists();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('چک‌لیست‌ها با موفقیت بازیابی شدند.')));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در بازیابی: ' + e.toString())));
-    }
-  }
-
-  void _toggleChecklistItem(_ChecklistItem item, bool done) {
-    final now = DateTime.now();
-    setState(() {
-      item.done = done;
-      item.history.add({'done': done, 'at': now.toIso8601String()});
-    });
-    _persistChecklists();
-  }
-
-  Future<String?> _askChecklistText({required String title, String hint = '', String initial = ''}) async {
-    final controller = TextEditingController(text: initial);
-    final value = await showDialog<String>(context: context, builder: (ctx) => AlertDialog(
-      title: Text(title),
-      content: TextField(controller: controller, autofocus: true,
-        textInputAction: TextInputAction.done,
-        decoration: InputDecoration(hintText: hint, border: const OutlineInputBorder()),
-        onSubmitted: (v) => Navigator.pop(ctx, v.trim())),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
-        FilledButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('ذخیره')),
-      ],
-    ));
-    controller.dispose();
-    if (value == null || value.trim().isEmpty) return null;
-    return value.trim();
-  }
-
-  Future<void> _importChecklistTxt() async {
-    final picked = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['txt'],
-      withData: true,
-    );
-    if (picked == null || picked.files.single.bytes == null || !mounted) return;
-    try {
-      final content = utf8.decode(picked.files.single.bytes!, allowMalformed: true)
-          .replaceFirst('\uFEFF', '');
-      final items = content.split(RegExp(r'\r?\n'))
-          .map((line) => line.trim()).where((line) => line.isNotEmpty).toList();
-      if (items.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('فایل انتخاب‌شده موردی برای وارد کردن ندارد.')));
-        return;
-      }
-      final fileName = picked.files.single.name.replaceFirst(
-        RegExp(r'\.txt$', caseSensitive: false), '');
-      final title = await _askChecklistText(
-        title: 'نام چک‌لیست واردشده', hint: 'نام چک‌لیست', initial: fileName);
-      if (title == null || !mounted) return;
-      setState(() => _checklists.insert(0, _Checklist(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        title: title,
-        items: items.map((line) => _ChecklistItem(title: line)).toList(),
-      )));
-      await _persistChecklists();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('\${items.length} مورد از فایل متنی وارد چک‌لیست «$title» شد.')));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خواندن فایل متنی ناموفق بود: $e')));
-    }
-  }
-
-  Future<void> _importChecklistExcel() async {
-    final picked = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['xlsx'],
-      withData: true,
-    );
-    if (picked == null || picked.files.single.bytes == null || !mounted) return;
-
-    try {
-      final workbook = Excel.decodeBytes(picked.files.single.bytes!);
-      if (workbook.tables.isEmpty) {
-        throw const FormatException('در فایل اکسل هیچ برگه‌ای پیدا نشد.');
-      }
-
-      // از اولین برگه استفاده می‌کنیم؛ هر ردیف غیرخالی یک مورد چک‌لیست است.
-      final sheet = workbook.tables[workbook.tables.keys.first]!;
-      final items = <_ChecklistItem>[];
-      for (final row in sheet.rows) {
-        final values = row
-            .map((cell) => cell?.value?.toString().trim() ?? '')
-            .where((value) => value.isNotEmpty)
-            .toList();
-        if (values.isEmpty) continue;
-        items.add(_ChecklistItem(title: values.join(' | ')));
-      }
-
-      if (items.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('فایل اکسل ردیف قابل استفاده‌ای ندارد.')),
-        );
-        return;
-      }
-
-      final fileName = picked.files.single.name.replaceFirst(
-        RegExp(r'\.xlsx$', caseSensitive: false),
-        '',
-      );
-      final checklistName = fileName.isEmpty ? 'چک‌لیست واردشده' : fileName;
-      setState(() => _checklists.insert(0, _Checklist(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        title: checklistName,
-        items: items,
-      )));
-      await _persistChecklists();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(
-            items.length.toString() + ' ردیف از فایل اکسل به چک‌لیست «' +
-            checklistName + '» وارد شد.',
-          )),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خواندن فایل اکسل ناموفق بود: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _createChecklistFromMultilineText() async {
-    final controller = TextEditingController();
-    final text = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('ساخت چک‌لیست از متن'),
-        content: SizedBox(width: double.maxFinite, child: TextField(
-          controller: controller, autofocus: true, minLines: 8, maxLines: 14,
-          textDirection: TextDirection.rtl,
-          decoration: const InputDecoration(
-            hintText: 'هر خط را در یک مورد جداگانه بنویسید...',
-            border: OutlineInputBorder(), alignLabelWithHint: true))),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, controller.text), child: const Text('ادامه')),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (text == null || !mounted) return;
-    final items = text.split(RegExp(r'\r?\n'))
-        .map((line) => line.trim()).where((line) => line.isNotEmpty).toList();
-    if (items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً حداقل یک مورد وارد کنید.')));
-      return;
-    }
-    final name = await _askChecklistText(
-      title: 'نام چک‌لیست', hint: 'مثلاً برنامه روزانه', initial: 'چک‌لیست جدید');
-    if (name == null || !mounted) return;
-    setState(() => _checklists.insert(0, _Checklist(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
-      title: name,
-      items: items.map((line) => _ChecklistItem(title: line)).toList(),
-    )));
-    await _persistChecklists();
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('\${items.length} مورد به چک‌لیست «$name» اضافه شد.')));
-  }
-
-  Future<void> _addChecklist() async {
-    final name = await _askChecklistText(title: 'چک‌لیست جدید', hint: 'مثلاً برنامه روزانه');
-    if (name == null || !mounted) return;
-    setState(() => _checklists.insert(0, _Checklist(
-      id: DateTime.now().microsecondsSinceEpoch.toString(), title: name)));
-    await _persistChecklists();
-  }
-
-  Future<void> _addChecklistItem(_Checklist list) async {
-    final text = await _askChecklistText(title: 'افزودن مورد', hint: 'عنوان مورد چک‌لیست');
-    if (text == null || !mounted) return;
-    setState(() => list.items.add(_ChecklistItem(title: text)));
-    await _persistChecklists();
-  }
-
-  Future<void> _editChecklist(_Checklist list) async {
-    final name = await _askChecklistText(title: 'ویرایش نام چک‌لیست', initial: list.title);
-    if (name == null || !mounted) return;
-    setState(() => list.title = name);
-    await _persistChecklists();
-  }
-
-  Future<void> _editChecklistItem(_Checklist list, _ChecklistItem item) async {
-    final title = await _askChecklistText(title: 'ویرایش مورد', initial: item.title);
-    if (title == null || !mounted) return;
-    setState(() => item.title = title);
-    await _persistChecklists();
-  }
-
-  Future<bool> _confirmChecklistDelete(String title) async {
-    return await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('حذف'),
-      content: Text('«$title» حذف شود؟'),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('حذف')),
-      ],
-    )) ?? false;
-  }
-
-  Future<void> _deleteChecklist(_Checklist list) async {
-    if (!await _confirmChecklistDelete(list.title) || !mounted) return;
-    setState(() => _checklists.remove(list));
-    await _persistChecklists();
-  }
-
-  Future<void> _deleteChecklistItem(_Checklist list, _ChecklistItem item) async {
-    if (!await _confirmChecklistDelete(item.title) || !mounted) return;
-    setState(() => list.items.remove(item));
-    await _persistChecklists();
-  }
-
-
-  Future<void> _loadChecklistTypographySettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    final itemPath = prefs.getString(_checklistItemFontPathKey);
-    final titlePath = prefs.getString(_checklistTitleFontPathKey);
-    String? itemFamily = prefs.getString(_checklistItemFontFamilyKey);
-    String? titleFamily = prefs.getString(_checklistTitleFontFamilyKey);
-    try {
-      if (itemPath != null && await File(itemPath).exists()) {
-        itemFamily ??= 'ChecklistItemFont';
-        final bytes = await File(itemPath).readAsBytes();
-        final loader = FontLoader(itemFamily)..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)));
-        await loader.load();
-      }
-      if (titlePath != null && await File(titlePath).exists()) {
-        titleFamily ??= 'ChecklistTitleFont';
-        final bytes = await File(titlePath).readAsBytes();
-        final loader = FontLoader(titleFamily)..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)));
-        await loader.load();
-      }
-    } catch (_) {
-      // A missing or invalid custom font should not prevent the app from opening.
-    }
-    if (!mounted) return;
-    setState(() {
-      _checklistItemFontSize = prefs.getDouble(_checklistItemFontSizeKey) ?? 15;
-      _checklistTitleFontSize = prefs.getDouble(_checklistTitleFontSizeKey) ?? 16;
-      _checklistItemFontFamily = itemFamily;
-      _checklistTitleFontFamily = titleFamily;
-    });
-  }
-
-  Future<void> _pickChecklistFont({required bool forTitle}) async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom, allowedExtensions: ['ttf', 'otf'], withData: true,
-    );
-    if (result == null || result.files.isEmpty) return;
-    final picked = result.files.single;
-    try {
-      final bytes = picked.bytes ?? (picked.path == null ? null : await File(picked.path!).readAsBytes());
-      if (bytes == null) throw Exception('خواندن فایل فونت ممکن نشد.');
-      final directory = await getApplicationSupportDirectory();
-      final fontsDirectory = Directory('${directory.path}/checklist_fonts');
-      await fontsDirectory.create(recursive: true);
-      final safeName = picked.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
-      final destination = File('${fontsDirectory.path}/${forTitle ? 'title' : 'item'}_${DateTime.now().millisecondsSinceEpoch}_$safeName');
-      await destination.writeAsBytes(bytes, flush: true);
-      final family = '${forTitle ? 'ChecklistTitleFont' : 'ChecklistItemFont'}${DateTime.now().microsecondsSinceEpoch}';
-      final loader = FontLoader(family)..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)));
-      await loader.load();
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(forTitle ? _checklistTitleFontPathKey : _checklistItemFontPathKey, destination.path);
-      await prefs.setString(forTitle ? _checklistTitleFontFamilyKey : _checklistItemFontFamilyKey, family);
-      if (!mounted) return;
-      setState(() {
-        if (forTitle) {
-          _checklistTitleFontFamily = family;
-        } else {
-          _checklistItemFontFamily = family;
-        }
-      });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فونت «${picked.name}» اضافه شد.')));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در افزودن فونت: $e')));
-    }
-  }
-
-  Future<void> _showChecklistTypographySettings() async {
-    double itemSize = _checklistItemFontSize;
-    double titleSize = _checklistTitleFontSize;
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('تنظیم اندازه و فونت چک‌لیست‌ها'),
-          content: SizedBox(
-            width: 380,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text('اندازه نوشته موارد چک‌لیست', style: TextStyle(fontWeight: FontWeight.bold)),
-                  Slider(
-                    min: 10, max: 30, divisions: 20, value: itemSize,
-                    label: itemSize.toStringAsFixed(0),
-                    onChanged: (value) => setDialogState(() => itemSize = value),
-                  ),
-                  Text('اندازه فعلی: ${itemSize.toStringAsFixed(0)}'),
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      Navigator.pop(dialogContext);
-                      await _pickChecklistFont(forTitle: false);
-                      if (mounted) _showChecklistTypographySettings();
-                    },
-                    icon: const Icon(Icons.font_download_outlined),
-                    label: Text(_checklistItemFontFamily == null ? 'افزودن فونت موارد' : 'تغییر فونت موارد'),
-                  ),
-                  const Divider(height: 28),
-                  const Text('اندازه عنوان چک‌لیست‌ها', style: TextStyle(fontWeight: FontWeight.bold)),
-                  Slider(
-                    min: 10, max: 32, divisions: 22, value: titleSize,
-                    label: titleSize.toStringAsFixed(0),
-                    onChanged: (value) => setDialogState(() => titleSize = value),
-                  ),
-                  Text('اندازه فعلی: ${titleSize.toStringAsFixed(0)}'),
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      Navigator.pop(dialogContext);
-                      await _pickChecklistFont(forTitle: true);
-                      if (mounted) _showChecklistTypographySettings();
-                    },
-                    icon: const Icon(Icons.font_download_outlined),
-                    label: Text(_checklistTitleFontFamily == null ? 'افزودن فونت عنوان‌ها' : 'تغییر فونت عنوان‌ها'),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text('فایل فونت باید با فرمت TTF یا OTF باشد.', style: TextStyle(color: Colors.black54, fontSize: 12)),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('انصراف')),
-            FilledButton(
-              onPressed: () async {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setDouble(_checklistItemFontSizeKey, itemSize);
-                await prefs.setDouble(_checklistTitleFontSizeKey, titleSize);
-                if (!mounted) return;
-                setState(() {
-                  _checklistItemFontSize = itemSize;
-                  _checklistTitleFontSize = titleSize;
-                });
-                Navigator.pop(dialogContext);
-              },
-              child: const Text('ذخیره تنظیمات'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildChecklistsPage() {
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      const Text('چک‌لیست‌های من', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 8),
-      const Text('برای هر بخش از کارها یک چک‌لیست جدا بساز و موارد انجام‌شده را علامت بزن.',
-        style: TextStyle(color: Colors.black54, height: 1.6)),
-      const SizedBox(height: 14),
-      if (_checklists.isEmpty)
-        const Padding(padding: EdgeInsets.symmetric(vertical: 36),
-          child: Center(child: Text('هنوز چک‌لیستی نساخته‌ای.')))
-      else
-        ..._checklists.map((list) {
-          final done = list.items.where((e) => e.done).length;
-          final total = list.items.length;
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            color: Colors.white,
-            child: ExpansionTile(
-              key: PageStorageKey<String>(list.id),
-              leading: Icon(Icons.checklist_rounded, color: _accentColor),
-              title: Text(list.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: _checklistTitleFontSize, fontFamily: _checklistTitleFontFamily)),
-              subtitle: Text('انجام‌شده: ${_persianDigits(done.toString())} از ${_persianDigits(total.toString())}'),
-              childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'edit') _editChecklist(list);
-                      if (value == 'delete') _deleteChecklist(list);
-                    },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'edit', child: Text('ویرایش نام')),
-                      PopupMenuItem(value: 'delete', child: Text('حذف چک‌لیست')),
-                    ],
-                  ),
-                ],
-              ),
-              children: [
-                if (total > 0)
-                  Padding(padding: const EdgeInsets.only(bottom: 8),
-                    child: LinearProgressIndicator(value: total == 0 ? 0 : done / total,
-                      color: _accentColor, backgroundColor: const Color(0xFFE9ECF3))),
-                if (list.items.isEmpty)
-                  const Padding(padding: EdgeInsets.all(12), child: Text('هنوز موردی اضافه نشده است.')),
-                ...list.items.map((item) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Checkbox(value: item.done, activeColor: _accentColor,
-                    onChanged: (value) async {
-                      _toggleChecklistItem(item, value ?? false);
-                      await _persistChecklists();
-                    }),
-                  title: Text(item.title,
-                    style: TextStyle(fontSize: _checklistItemFontSize, fontFamily: _checklistItemFontFamily,
-                      decoration: item.done ? TextDecoration.lineThrough : null,
-                      color: item.done ? Colors.black45 : null)),
-                  subtitle: item.history.isEmpty ? null : Text(
-                    'آخرین تغییر: ${_jalaliDate(DateTime.parse(item.history.last['at'] as String))} - ${_clockTime(DateTime.parse(item.history.last['at'] as String))}'),
-                  onTap: () async {
-                    _toggleChecklistItem(item, !item.done);
-                    await _persistChecklists();
-                  },
-                  trailing: PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'edit') _editChecklistItem(list, item);
-                      if (value == 'delete') _deleteChecklistItem(list, item);
-                    },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'edit', child: Text('ویرایش')),
-                      PopupMenuItem(value: 'delete', child: Text('حذف')),
-                    ],
-                  ),
-                )),
-                Align(alignment: Alignment.centerRight,
-                  child: TextButton.icon(onPressed: () => _addChecklistItem(list),
-                    icon: const Icon(Icons.add), label: const Text('افزودن مورد'))),
-              ],
-            ),
-          );
-        }),
-    ]);
   }
 
   Future<void> _initializeAlarmNotifications() async {
