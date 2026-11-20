@@ -2309,12 +2309,24 @@ class _MainScreenState extends State<MainScreen> {
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                     Builder(builder: (context) {
                       final active = _runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull;
-                      final isRunning = active?.stopwatch.isRunning ?? false;
-                      return IconButton(
-                        tooltip: isRunning ? 'مکث تایمر همین فعالیت' : 'شروع تایمر همین فعالیت',
-                        onPressed: active == null ? () => _startNewActivity(name) : isRunning ? () => _pauseActivity(active) : () => _startActivity(active),
-                        icon: Icon(isRunning ? Icons.pause_circle_filled : Icons.play_circle_fill, color: _accentColor),
-                      );
+                      const buttonSize = 28.0;
+                      return Row(mainAxisSize: MainAxisSize.min, children: [
+                        SizedBox(width: buttonSize, height: buttonSize, child: IconButton(
+                          padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: buttonSize, height: buttonSize),
+                          tooltip: 'شروع', onPressed: active == null ? () => _startNewActivity(name) : () => _startActivity(active),
+                          icon: Icon(Icons.play_arrow_rounded, size: 18, color: _accentColor),
+                        )),
+                        SizedBox(width: buttonSize, height: buttonSize, child: IconButton(
+                          padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: buttonSize, height: buttonSize),
+                          tooltip: 'مکث', onPressed: active == null ? null : () => _pauseActivity(active),
+                          icon: Icon(Icons.pause_rounded, size: 18, color: _accentColor),
+                        )),
+                        SizedBox(width: buttonSize, height: buttonSize, child: IconButton(
+                          padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: buttonSize, height: buttonSize),
+                          tooltip: 'پایان و ثبت', onPressed: active == null ? null : () => _stopActivity(active),
+                          icon: Icon(Icons.stop_rounded, size: 18, color: Colors.redAccent),
+                        )),
+                      ]);
                     }),
                     Text(_durationText(Duration(seconds: (_runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull?.stopwatch.elapsed.inSeconds ?? 0) + (totalByName[name] ?? 0))),
                       textDirection: TextDirection.ltr,
