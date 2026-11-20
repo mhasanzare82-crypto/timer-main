@@ -1025,6 +1025,11 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _startNewActivity(String name) async {
     if (name.trim().isEmpty) return;
+    final existing = _runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull;
+    if (existing != null) {
+      if (!existing.stopwatch.isRunning) await _startActivity(existing);
+      return;
+    }
     final activity = _RunningActivity(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: name.trim(),
@@ -2302,7 +2307,15 @@ class _MainScreenState extends State<MainScreen> {
                   title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
                   subtitle: Text(_activitiesGroupedView ? 'مشاهده تمام دفعات ثبت‌شده' : 'مشاهده تاریخچه'),
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                    IconButton(tooltip: 'شروع تایمر', onPressed: () => _startNewActivity(name), icon: Icon(Icons.play_circle_fill, color: _accentColor)),
+                    Builder(builder: (context) {
+                      final active = _runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull;
+                      final isRunning = active?.stopwatch.isRunning ?? false;
+                      return IconButton(
+                        tooltip: isRunning ? 'مکث تایمر همین فعالیت' : 'شروع تایمر همین فعالیت',
+                        onPressed: active == null ? () => _startNewActivity(name) : isRunning ? () => _pauseActivity(active) : () => _startActivity(active),
+                        icon: Icon(isRunning ? Icons.pause_circle_filled : Icons.play_circle_fill, color: _accentColor),
+                      );
+                    }),
                     Text(_durationText(Duration(seconds: totalByName[name] ?? 0)),
                       textDirection: TextDirection.ltr,
                       style: TextStyle(color: _accentColor, fontWeight: FontWeight.bold)),
