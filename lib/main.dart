@@ -997,8 +997,7 @@ class _MainScreenState extends State<MainScreen> {
             hintText: 'مثلاً مطالعه یا ورزش',
             border: OutlineInputBorder(),
           ),
-          onSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),
-        ),
+          onSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('انصراف')),
           FilledButton(
@@ -1025,6 +1024,10 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _startNewActivity(String name) async {
     if (name.trim().isEmpty) return;
+    if (_runningActivities.any((a) => a.stopwatch.isRunning && a.name.trim().toLowerCase() != name.trim().toLowerCase())) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ابتدا تایمر فعال دیگر را مکث یا متوقف کن.')));
+      return;
+    }
     final existing = _runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull;
     if (existing != null) {
       if (!existing.stopwatch.isRunning) await _startActivity(existing);
@@ -1040,6 +1043,10 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _createActivityTimer() async {
+    if (_runningActivities.any((a) => a.stopwatch.isRunning)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ابتدا تایمر فعال دیگر را مکث یا متوقف کن.')));
+      return;
+    }
     final activity = _RunningActivity(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: '',
@@ -1118,6 +1125,10 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _startActivity(_RunningActivity activity) async {
     if (activity.stopwatch.isRunning) return;
+    if (_runningActivities.any((a) => a.id != activity.id && a.stopwatch.isRunning)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('هم‌زمان فقط یک تایمر می‌تواند در حال اجرا باشد.')));
+      return;
+    }
     setState(() => activity.stopwatch.start());
     await _persistRunningActivities();
   }
@@ -1997,8 +2008,7 @@ class _MainScreenState extends State<MainScreen> {
       final now = DateTime.now();
       final expired = <_CountdownTimer>[];
       for (final item in restored) {
-        if (item.running && item.endsAt != null) {
-          final left = item.endsAt!.difference(now).inSeconds;
+        if (item.running && item.endsAt != null) {          final left = item.endsAt!.difference(now).inSeconds;
           if (left <= 0) {
             item.remainingSeconds = 0;
             item.running = false;
@@ -2305,7 +2315,11 @@ class _MainScreenState extends State<MainScreen> {
                   onTap: () => _openActivityDetails(name),
                   leading: Icon(Icons.label_outline_rounded, color: _accentColor),
                   title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(_activitiesGroupedView ? 'مشاهده تمام دفعات ثبت‌شده' : 'مشاهده تاریخچه'),
+                  subtitle: Builder(builder: (context) {
+                    final current = _runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull;
+                    final status = current == null ? 'آماده شروع • مشاهده سوابق' : current.stopwatch.isRunning ? '● در حال اجرا • زمان زنده' : 'مکث شده • برای ادامه شروع را بزن';
+                    return Text(status, style: TextStyle(color: current?.stopwatch.isRunning == true ? Colors.green : Colors.black54, fontSize: 12));
+                  }),
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                     Builder(builder: (context) {
                       final active = _runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull;
