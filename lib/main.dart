@@ -539,9 +539,82 @@ class _AlarmsPageState extends State<_AlarmsPage>{
  }
  Future<void> toggle(_SavedAlarm a,bool v)async{a.enabled=v;await save();await schedule(a);setState((){});}
  Future<void> remove(_SavedAlarm a)async{await cancel(a);items.remove(a);await save();setState((){});}
- @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('زنگ هشدارها')),floatingActionButton:FloatingActionButton.extended(onPressed:()=>edit(null),icon:const Icon(Icons.add_alarm),label:const Text('زنگ جدید')),body:loading?const Center(child:CircularProgressIndicator()):items.isEmpty?const Center(child:Text('هنوز زنگی ثبت نشده است.')):ListView.builder(padding:const EdgeInsets.all(12),itemCount:items.length,itemBuilder:(ctx,i){final a=items[i];return Card(child:ListTile(leading:Icon(Icons.alarm,color:a.enabled?Theme.of(context).colorScheme.primary:Colors.grey),title:Text(time(a),textDirection:TextDirection.ltr,style:const TextStyle(fontSize:23,fontWeight:FontWeight.bold)),subtitle:Text('${a.title}\\n${repeat(a)}${a.sound==null?'':'\\nفایل زنگ ذخیره شده'}'),isThreeLine:true,trailing:Wrap(children:[Switch(value:a.enabled,onChanged:(v)=>toggle(a,v)),IconButton(icon:const Icon(Icons.edit),onPressed:()=>edit(a)),IconButton(icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>remove(a))])));}));
+ @override Widget build(BuildContext context)=>Scaffold(
+  appBar:AppBar(title:const Text('زنگ هشدارها')),
+  floatingActionButton:FloatingActionButton.extended(onPressed:()=>edit(null),icon:const Icon(Icons.add_alarm),label:const Text('زنگ جدید')),
+  body:loading?const Center(child:CircularProgressIndicator()):ListView(
+    padding:const EdgeInsets.fromLTRB(12,12,12,90),
+    children:[
+      const _AlarmCountdownPanel(),
+      const SizedBox(height:12),
+      if(items.isEmpty) const Padding(padding:EdgeInsets.all(20),child:Center(child:Text('هنوز زنگی ثبت نشده است.'))),
+      ...items.map((a)=>Card(child:ListTile(
+        leading:Icon(Icons.alarm,color:a.enabled?Theme.of(context).colorScheme.primary:Colors.grey),
+        title:Text(time(a),textDirection:TextDirection.ltr,style:const TextStyle(fontSize:23,fontWeight:FontWeight.bold)),
+        subtitle:Text('${a.title}\\n${repeat(a)}${a.sound==null?'':'\\nفایل زنگ ذخیره شده'}'),
+        isThreeLine:true,
+        trailing:Wrap(children:[
+          Switch(value:a.enabled,onChanged:(v)=>toggle(a,v)),
+          IconButton(icon:const Icon(Icons.edit),onPressed:()=>edit(a)),
+          IconButton(icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>remove(a)),
+        ]),
+      ))),
+    ],
+  ),
+);
+
 }
 
+class _AlarmCountdownPanel extends StatefulWidget {
+ const _AlarmCountdownPanel();
+ @override State<_AlarmCountdownPanel> createState()=>_AlarmCountdownPanelState();
+}
+class _AlarmCountdownPanelState extends State<_AlarmCountdownPanel>{
+ final hController=TextEditingController(text:'0');
+ final mController=TextEditingController(text:'5');
+ final sController=TextEditingController(text:'0');
+ Timer? ticker;
+ int remaining=0;
+ bool running=false;
+ @override void dispose(){ticker?.cancel();hController.dispose();mController.dispose();sController.dispose();super.dispose();}
+ String display(int value)=>'${(value~/3600).toString().padLeft(2,'0')}:${((value%3600)~/60).toString().padLeft(2,'0')}:${(value%60).toString().padLeft(2,'0')}';
+ void start(){
+   if(running)return;
+   if(remaining<=0){final h=int.tryParse(hController.text)??0;final m=int.tryParse(mController.text)??0;final s=int.tryParse(sController.text)??0;remaining=h*3600+m*60+s;}
+   if(remaining<=0){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('زمانی بیشتر از صفر وارد کن.')));return;}
+   setState(()=>running=true);
+   ticker?.cancel();
+   ticker=Timer.periodic(const Duration(seconds:1),(t){
+     if(!mounted)return;
+     if(remaining<=1){t.cancel();setState(()=>remaining=0);setState(()=>running=false);_notifyFinish();return;}
+     setState(()=>remaining--);
+   });
+ }
+ void pause(){ticker?.cancel();setState(()=>running=false);}
+ void reset(){ticker?.cancel();final h=int.tryParse(hController.text)??0;final m=int.tryParse(mController.text)??0;final s=int.tryParse(sController.text)??0;setState(()=>running=false);setState(()=>remaining=h*3600+m*60+s);}
+ Future<void> _notifyFinish()async{
+   try{await _notifications.show(880001,'پایان تایمر معکوس','زمان شمارش معکوس به پایان رسید.',const NotificationDetails(android:AndroidNotificationDetails('alarm_countdown_section','تایمر بخش هشدارها',channelDescription:'اعلان پایان شمارش معکوس',importance:Importance.max,priority:Priority.max,playSound:true,enableVibration:true,category:AndroidNotificationCategory.alarm)));}catch(_){}
+   if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('زمان تایمر به پایان رسید!')));
+ }
+ Widget numberField(String label,TextEditingController c)=>SizedBox(width:70,child:TextField(controller:c,keyboardType:TextInputType.number,textAlign:TextAlign.center,decoration:InputDecoration(labelText:label,border:const OutlineInputBorder()),enabled:!running,onChanged:(_)=>reset()));
+ @override Widget build(BuildContext context)=>Card(
+   child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+     Row(children:[Icon(Icons.hourglass_bottom,color:Theme.of(context).colorScheme.primary),const SizedBox(width:8),const Text('تایمر معکوس',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold))]),
+     const SizedBox(height:12),
+     if(!running&&remaining==0)Row(mainAxisAlignment:MainAxisAlignment.center,children:[numberField('ساعت',hController),const SizedBox(width:8),numberField('دقیقه',mController),const SizedBox(width:8),numberField('ثانیه',sController)]),
+     const SizedBox(height:8),
+     Center(child:Text(display(remaining),textDirection:TextDirection.ltr,style:TextStyle(fontSize:34,fontWeight:FontWeight.bold,color:Theme.of(context).colorScheme.primary))),
+     const SizedBox(height:10),
+     Row(mainAxisAlignment:MainAxisAlignment.center,children:[
+       if(!running)FilledButton.icon(onPressed:start,icon:const Icon(Icons.play_arrow),label:Text(remaining>0?'ادامه':'شروع')),
+       if(running)FilledButton.icon(onPressed:pause,icon:const Icon(Icons.pause),label:const Text('مکث')),
+       const SizedBox(width:8),
+       OutlinedButton.icon(onPressed:reset,icon:const Icon(Icons.restart_alt),label:const Text('بازنشانی')),
+     ]),
+     const Text('در پایان زمان، اعلان هشدار نمایش داده می‌شود.',textAlign:TextAlign.center,style:TextStyle(fontSize:12,color:Colors.black54)),
+   ])),
+ );
+}
 class MainScreen extends StatefulWidget {
   final bool biometricLockEnabled;
   final Future<void> Function(bool) onToggleBiometricLock;
