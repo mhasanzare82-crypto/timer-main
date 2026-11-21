@@ -582,7 +582,7 @@ class _AlarmCountdownPanelState extends State<_AlarmCountdownPanel>{
  bool running=false;
  @override void dispose(){ticker?.cancel();hController.dispose();mController.dispose();sController.dispose();super.dispose();}
  String display(int value)=>'${(value~/3600).toString().padLeft(2,'0')}:${((value%3600)~/60).toString().padLeft(2,'0')}:${(value%60).toString().padLeft(2,'0')}';
- void start(){
+ Future<void> start() async {
    if(running)return;
    if(remaining<=0){final h=int.tryParse(hController.text)??0;final m=int.tryParse(mController.text)??0;final s=int.tryParse(sController.text)??0;remaining=h*3600+m*60+s;}
    if(remaining<=0){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('زمانی بیشتر از صفر وارد کن.')));return;}
@@ -596,7 +596,7 @@ class _AlarmCountdownPanelState extends State<_AlarmCountdownPanel>{
      setState(()=>remaining--);
    });
  }
- void pause(){ticker?.cancel();_notifications.cancel(880001);if(endsAt!=null){remaining=endsAt!.difference(DateTime.now()).inSeconds.clamp(0,remaining);}endsAt=null;setState(()=>running=false);}
+ void pause(){ticker?.cancel();_notifications.cancel(880001);if(endsAt!=null){remaining=endsAt!.difference(DateTime.now()).inSeconds.clamp(0,remaining).toInt();}endsAt=null;setState(()=>running=false);}
  void reset(){ticker?.cancel();_notifications.cancel(880001);endsAt=null;final h=int.tryParse(hController.text)??0;final m=int.tryParse(mController.text)??0;final s=int.tryParse(sController.text)??0;setState(()=>running=false);setState(()=>remaining=h*3600+m*60+s);}
  Future<void> _notifyFinish()async{
    try{await _notifications.show(880001,'پایان تایمر معکوس','زمان شمارش معکوس به پایان رسید.',const NotificationDetails(android:AndroidNotificationDetails('alarm_countdown_section','تایمر بخش هشدارها',channelDescription:'اعلان پایان شمارش معکوس',importance:Importance.max,priority:Priority.max,playSound:true,enableVibration:true,category:AndroidNotificationCategory.alarm)));}catch(_){}
