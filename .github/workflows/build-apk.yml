@@ -46,6 +46,17 @@ jobs:
       - name: Build release APK
         run: flutter build apk --release
 
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: timer-main-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
