@@ -385,16 +385,18 @@ class _CountdownTimer {
   DateTime? endsAt;
   bool running = false;
   bool finished = false;
+  String? alarmSoundPath;
 
   _CountdownTimer({
     required this.id, required this.title, required this.totalSeconds,
     int? remainingSeconds, this.endsAt, this.running = false, this.finished = false,
+    this.alarmSoundPath,
   }) : remainingSeconds = remainingSeconds ?? totalSeconds;
 
   Map<String, dynamic> toJson() => {
     'id': id, 'title': title, 'totalSeconds': totalSeconds,
     'remainingSeconds': remainingSeconds, 'endsAt': endsAt?.millisecondsSinceEpoch,
-    'running': running, 'finished': finished,
+    'running': running, 'finished': finished, 'alarmSoundPath': alarmSoundPath,
   };
 
   factory _CountdownTimer.fromJson(Map<String, dynamic> json) {
@@ -407,6 +409,7 @@ class _CountdownTimer {
       endsAt: endsAtMs == null ? null : DateTime.fromMillisecondsSinceEpoch(endsAtMs),
       running: json['running'] as bool? ?? false,
       finished: json['finished'] as bool? ?? false,
+      alarmSoundPath: json['alarmSoundPath'] as String?,
     );
   }
 }
@@ -2282,13 +2285,11 @@ class _MainScreenState extends State<MainScreen> {
     await _notifications.cancel(item.id);
     if (_countdownAlarmEnabled) {
       await _notifications.show(item.id,'پایان تایمر','زمان «'+item.title+'» به پایان رسید.',_alarmDetails,payload:'countdown:'+item.id.toString());
-      if (_countdownAlarmSound) {
-        final customPath = _customAlarmSoundPath;
-        if (customPath != null && File(customPath).existsSync()) {
-          try { await _customAlarmPlayer.stop(); await _customAlarmPlayer.play(DeviceFileSource(customPath)); }
-          catch (_) { SystemSound.play(SystemSoundType.alert); }
-        } else { SystemSound.play(SystemSoundType.alert); }
-      }
+      final customPath = item.alarmSoundPath;
+      if (_countdownAlarmSound && customPath != null && File(customPath).existsSync()) {
+        try { await _customAlarmPlayer.stop(); await _customAlarmPlayer.play(DeviceFileSource(customPath)); }
+        catch (_) { SystemSound.play(SystemSoundType.alert); }
+      } else if (_countdownAlarmSound) { SystemSound.play(SystemSoundType.alert); }
     }
   }
   Future<void> _addCountdown() async {
@@ -2438,6 +2439,30 @@ class _MainScreenState extends State<MainScreen> {
       else ..._countdowns.map(_buildCountdownCard),
     ]);
   }
+  Future<void> _chooseCountdownSound(_CountdownTimer item) async {
+    final picked = await FilePicker.pickFile(type: FileType.audio);
+    if (picked == null || picked.path == null) return;
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final fileName = picked.path!.split(RegExp(r'[/\\]')).last;
+      final saved = await File(picked.path!).copy('${dir.path}/countdown_${item.id}_${DateTime.now().millisecondsSinceEpoch}_$fileName');
+      if (!mounted) return;
+      setState(() => item.alarmSoundPath = saved.path);
+      await _persistCountdowns();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('صدای اختصاصی این تایمر ذخیره شد.')));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ذخیره فایل صدا انجام نشد.')));
+    }
+  }
+  Future<void> _previewCountdownSound(_CountdownTimer item) async {
+    final path = item.alarmSoundPath;
+    if (path == null || !File(path).existsSync()) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('برای این تایمر صدای اختصاصی انتخاب نشده است.')));
+      return;
+    }
+    try { await _customAlarmPlayer.stop(); await _customAlarmPlayer.play(DeviceFileSource(path)); }
+    catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('پخش فایل صدا ممکن نشد.'))); }
+  }
   Widget _buildCountdownCard(_CountdownTimer item){
     final progress=item.totalSeconds==0?0.0:(item.remainingSeconds/item.totalSeconds).clamp(0.0,1.0);
     return Container(margin:const EdgeInsets.only(bottom:12),padding:const EdgeInsets.all(14),
@@ -2446,6 +2471,14 @@ class _MainScreenState extends State<MainScreen> {
         Row(children:[Expanded(child:Text(item.title,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:16))),
           IconButton(tooltip:'حذف تایمر',onPressed:()async{await _notifications.cancel(item.id);if(mounted){setState(()=>_countdowns.remove(item));await _persistCountdowns();}},
             icon:const Icon(Icons.delete_outline,color:Colors.redAccent))]),
+        const SizedBox(height:8),
+        Card(color:const Color(0xFFF7F8FC),elevation:0,child:Padding(padding:const EdgeInsets.symmetric(horizontal:8,vertical:6),child:Column(children:[
+          Row(children:[Expanded(child:Text(item.alarmSoundPath==null?'زنگ پیش‌فرض برای این تایمر':'زنگ اختصاصی انتخاب شده',style:const TextStyle(fontSize:12))),
+            IconButton(tooltip:'پخش آزمایشی زنگ',onPressed:item.alarmSoundPath==null?null:()=>_previewCountdownSound(item),icon:const Icon(Icons.play_circle_outline)),
+          ]),
+          SizedBox(width:double.infinity,child:OutlinedButton.icon(onPressed:()=>_chooseCountdownSound(item),icon:const Icon(Icons.music_note),label:const Text('انتخاب زنگ مخصوص این تایمر'))),
+          if(item.alarmSoundPath!=null) TextButton.icon(onPressed:()async{setState(()=>item.alarmSoundPath=null);await _persistCountdowns();},icon:const Icon(Icons.delete_outline),label:const Text('حذف زنگ اختصاصی')),
+        ]))),
         const SizedBox(height:8),
         SizedBox(width:174,height:174,child:Stack(alignment:Alignment.center,children:[
           SizedBox.expand(child:CircularProgressIndicator(value:progress,strokeWidth:11,strokeCap:StrokeCap.round,
