@@ -558,6 +558,7 @@ class _MainScreenState extends State<MainScreen> {
 
   int _selectedIndex = 0;
   bool _activitiesGroupedView = true;
+  String? _openedActivityFolder;
   Color _accentColor = _colors.first;
   DateTime _now = DateTime.now();
   static const _clockOffsetStorageKey = 'program_clock_offset_minutes_v1';
@@ -2368,110 +2369,45 @@ class _MainScreenState extends State<MainScreen> {
       ]));
   }
 
-  Widget _buildActivitiesPage() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Row(
-          children: [
-            const Expanded(child: Text('فهرست فعالیت‌ها', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold))),
-            FilledButton.icon(
-              onPressed: _addActivityToCatalog,
-              icon: const Icon(Icons.add, size: 19),
-              label: const Text('فعالیت جدید'),
-              style: FilledButton.styleFrom(backgroundColor: _accentColor),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Align(alignment: Alignment.centerLeft, child: OutlinedButton.icon(
-          onPressed: _manageActivityCategories, icon: const Icon(Icons.folder_outlined), label: const Text('مدیریت پوشه‌ها'))),
-        const Text(
-          'برای مشاهده سوابق، روی فعالیت بزن. پوشه‌ها فقط برای دسته‌بندی و انتقال فعالیت‌ها استفاده می‌شوند.',
-          style: TextStyle(color: Colors.black54, height: 1.6),
-        ),
-        const SizedBox(height: 14),
-        if (_activityNames.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 30),
-            child: Center(child: Text('هنوز فعالیتی اضافه نکرده‌ای.')),
-          )
-        else
-          ..._activityNames.map((name) => Card(
-                margin: const EdgeInsets.only(bottom: 9),
-                color: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: Color(0xFFE8EAF0)),
-                ),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  minLeadingWidth: 28,
-                  onTap: () => _openActivityDetails(name),
-                  leading: Icon(Icons.label_outline_rounded, color: _accentColor),
-                  title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Builder(builder: (context) {
-                    final current = _runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull;
-                    final status = current == null ? 'آماده شروع • مشاهده سوابق' : current.stopwatch.isRunning ? '● در حال اجرا' : 'مکث شده • برای ادامه شروع را بزن';
-                    return Text(status, style: TextStyle(color: current?.stopwatch.isRunning == true ? Colors.green : Colors.black54, fontSize: 12));
-                  }),
-                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Builder(builder: (context) {
-                      final active = _runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull;
-                      const buttonSize = 36.0;
-                      return Row(mainAxisSize: MainAxisSize.min, children: [
-                        SizedBox(width: buttonSize, height: buttonSize, child: IconButton(
-                          padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: buttonSize, height: buttonSize),
-                          tooltip: 'شروع', onPressed: active == null ? () => _startNewActivity(name) : () => _startActivity(active),
-                          icon: Icon(Icons.play_arrow_rounded, size: 23, color: _accentColor),
-                        )),
-                        SizedBox(width: buttonSize, height: buttonSize, child: IconButton(
-                          padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: buttonSize, height: buttonSize),
-                          tooltip: 'مکث', onPressed: active == null ? null : () => _pauseActivity(active),
-                          icon: Icon(Icons.pause_rounded, size: 23, color: _accentColor),
-                        )),
-                        SizedBox(width: buttonSize, height: buttonSize, child: IconButton(
-                          padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: buttonSize, height: buttonSize),
-                          tooltip: 'پایان و ثبت', onPressed: active == null ? null : () => _stopActivity(active),
-                          icon: Icon(Icons.stop_rounded, size: 23, color: Colors.redAccent),
-                        )),
-                      ]);
-                    }),
-                    Text(_durationText(Duration(seconds: _runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull?.stopwatch.elapsed.inSeconds ?? 0)),
-                      textDirection: TextDirection.ltr,
-                      style: TextStyle(color: _accentColor, fontWeight: FontWeight.bold, fontSize: 15)),
-                    PopupMenuButton<String>(
-                      tooltip: 'مدیریت فعالیت',
-                      onSelected: (value) {
-                        if (value == '__manual_time__') {
-                          _addManualActivityTime(name);
-                        } else if (value == '__edit_activity__') {
-                          _editActivityName(name);
-                        } else if (value == '__delete_activity__') {
-                          _deleteActivity(name);
-                        } else if (value == '__move__') {
-                          _setActivityCategory(name);
-                        } else {
-                          setState(() => _activityCategories[name] = value);
-                          _persistActivityCategories();
-                        }
-                      },
-                      itemBuilder: (_) => [
-                        const PopupMenuItem(value: '__manual_time__', child: Text('ثبت زمان دستی')),
-                        const PopupMenuItem(value: '__edit_activity__', child: Text('ویرایش نام فعالیت')),
-                        const PopupMenuItem(value: '__delete_activity__', child: Text('حذف فعالیت', style: TextStyle(color: Colors.red))),
-                        const PopupMenuDivider(),
-                        const PopupMenuItem(value: '__move__', child: Text('انتقال به پوشه')),
-                      ],
-                    ),
-                  ]),
-                ),
-              )),
-      ],
-    );
+
+  Widget _activityCard(String name) {
+    final active=_runningActivities.where((a)=>a.name.trim().toLowerCase()==name.trim().toLowerCase()).firstOrNull;
+    final status=active==null?'آماده شروع • مشاهده سوابق':active.stopwatch.isRunning?'● در حال اجرا':'مکث شده • برای ادامه شروع را بزن';
+    const buttonSize=36.0;
+    return Card(margin:const EdgeInsets.only(bottom:9),color:Colors.white,elevation:0,shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(16),side:const BorderSide(color:Color(0xFFE8EAF0))),child:ListTile(contentPadding:const EdgeInsets.symmetric(horizontal:6,vertical:2),minLeadingWidth:28,onTap:()=>_openActivityDetails(name),leading:Icon(Icons.label_outline_rounded,color:_accentColor),title:Text(name,style:const TextStyle(fontWeight:FontWeight.w600)),subtitle:Text(status,style:TextStyle(color:active?.stopwatch.isRunning==true?Colors.green:Colors.black54,fontSize:12)),trailing:Row(mainAxisSize:MainAxisSize.min,children:[
+      Row(mainAxisSize:MainAxisSize.min,children:[
+       SizedBox(width:buttonSize,height:buttonSize,child:IconButton(padding:EdgeInsets.zero,constraints:const BoxConstraints.tightFor(width:buttonSize,height:buttonSize),tooltip:'شروع',onPressed:active==null?()=>_startNewActivity(name):()=>_startActivity(active),icon:Icon(Icons.play_arrow_rounded,size:23,color:_accentColor))),
+       SizedBox(width:buttonSize,height:buttonSize,child:IconButton(padding:EdgeInsets.zero,constraints:const BoxConstraints.tightFor(width:buttonSize,height:buttonSize),tooltip:'مکث',onPressed:active==null?null:()=>_pauseActivity(active),icon:Icon(Icons.pause_rounded,size:23,color:_accentColor))),
+       SizedBox(width:buttonSize,height:buttonSize,child:IconButton(padding:EdgeInsets.zero,constraints:const BoxConstraints.tightFor(width:buttonSize,height:buttonSize),tooltip:'پایان و ثبت',onPressed:active==null?null:()=>_stopActivity(active),icon:const Icon(Icons.stop_rounded,size:23,color:Colors.redAccent))),
+      ]),
+      Text(_durationText(Duration(seconds:active?.stopwatch.elapsed.inSeconds??0)),textDirection:TextDirection.ltr,style:TextStyle(color:_accentColor,fontWeight:FontWeight.bold,fontSize:15)),
+      PopupMenuButton<String>(tooltip:'مدیریت فعالیت',onSelected:(v){if(v=='__manual_time__'){_addManualActivityTime(name);}else if(v=='__edit_activity__'){_editActivityName(name);}else if(v=='__delete_activity__'){_deleteActivity(name);}else if(v=='__move__'){_setActivityCategory(name);}},itemBuilder:(_)=>const [PopupMenuItem(value:'__manual_time__',child:Text('ثبت زمان دستی')),PopupMenuItem(value:'__edit_activity__',child:Text('ویرایش نام فعالیت')),PopupMenuItem(value:'__delete_activity__',child:Text('حذف فعالیت',style:TextStyle(color:Colors.red))),PopupMenuDivider(),PopupMenuItem(value:'__move__',child:Text('انتقال به پوشه'))])
+    ])));
   }
 
+  Widget _buildActivitiesPage() {
+    final folders=_activityCategoryNames.where((folder)=>_activityNames.any((name)=>(_activityCategories[name]??'بدون پوشه')==folder)).toList();
+    final visible=_openedActivityFolder==null?_activityNames.where((n)=>(_activityCategories[n]??'بدون پوشه')=='بدون پوشه').toList():_activityNames.where((n)=>(_activityCategories[n]??'بدون پوشه')==_openedActivityFolder).toList();
+    return ListView(padding:const EdgeInsets.all(16),children:[
+      Row(children:[const Expanded(child:Text('فهرست فعالیت‌ها',style:TextStyle(fontSize:19,fontWeight:FontWeight.bold))),FilledButton.icon(onPressed:_addActivityToCatalog,icon:const Icon(Icons.add,size:19),label:const Text('فعالیت جدید'),style:FilledButton.styleFrom(backgroundColor:_accentColor))]),
+      const SizedBox(height:10),
+      SegmentedButton<bool>(segments:const [ButtonSegment(value:false,label:Text('فعالیت‌ها'),icon:Icon(Icons.list_alt)),ButtonSegment(value:true,label:Text('پوشه‌ها'),icon:Icon(Icons.folder_outlined))],selected:{_activitiesGroupedView},onSelectionChanged:(v)=>setState(()=>_activitiesGroupedView=v.first)),
+      const SizedBox(height:10),
+      Align(alignment:Alignment.centerLeft,child:OutlinedButton.icon(onPressed:_manageActivityCategories,icon:const Icon(Icons.folder_open),label:const Text('مدیریت پوشه‌ها'))),
+      if(!_activitiesGroupedView)...[
+        const Text('همه فعالیت‌ها مستقل از پوشه‌ها در این فهرست نمایش داده می‌شوند.',style:TextStyle(color:Colors.black54)),
+        const SizedBox(height:8),
+        if(_activityNames.isEmpty)const Padding(padding:EdgeInsets.all(24),child:Center(child:Text('هنوز فعالیتی اضافه نکرده‌ای.'))) else ..._activityNames.map(_activityCard),
+      ]else if(_openedActivityFolder!=null)...[
+        Row(children:[IconButton(onPressed:()=>setState(()=>_openedActivityFolder=null),icon:const Icon(Icons.arrow_back)),Expanded(child:Text(_openedActivityFolder!,style:const TextStyle(fontSize:18,fontWeight:FontWeight.bold)))]),
+        if(visible.isEmpty)const Padding(padding:EdgeInsets.all(24),child:Center(child:Text('این پوشه هنوز فعالیتی ندارد.')))else ...visible.map(_activityCard),
+      ]else...[
+        Card(color:Colors.white,elevation:0,child:ListTile(leading:Icon(Icons.folder_off_outlined,color:_accentColor),title:const Text('بدون پوشه'),subtitle:Text('\${_activityNames.where((n)=>(_activityCategories[n]??'بدون پوشه')=='بدون پوشه').length} فعالیت'),onTap:()=>setState(()=>_openedActivityFolder='بدون پوشه'))),
+        if(folders.isEmpty)const Padding(padding:EdgeInsets.all(24),child:Center(child:Text('هنوز پوشه‌ای برای فعالیت‌ها ساخته نشده است.')))
+        else ...folders.map((folder)=>Card(color:Colors.white,elevation:0,child:ListTile(leading:Icon(Icons.folder,color:_accentColor),title:Text(folder),subtitle:Text('\${_activityNames.where((n)=>(_activityCategories[n]??'بدون پوشه')==folder).length} فعالیت'),trailing:const Icon(Icons.chevron_left),onTap:()=>setState(()=>_openedActivityFolder=folder)))),
+      ],
+    ]);
+  }
   Widget _detailLine(String label, String value) {
     return Row(
       children: [
