@@ -22,10 +22,21 @@ final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotifications
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Launch the UI first so plugin initialization cannot leave a blank screen.
   tzdata.initializeTimeZones();
-  const initSettings = InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher'));
-  await _notifications.initialize(initSettings);
   runApp(const TimerApp());
+
+  // Notification setup is non-critical for displaying the app. Run it after
+  // startup and catch plugin/platform errors instead of blocking the first frame.
+  try {
+    const initSettings = InitializationSettings(
+      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+    );
+    await _notifications.initialize(initSettings);
+  } catch (error, stackTrace) {
+    debugPrint('Notification initialization failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
 }
 
 class TimerApp extends StatelessWidget {
