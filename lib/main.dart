@@ -199,69 +199,74 @@ class _BiometricGateState extends State<_BiometricGate>
 
   @override
   Widget build(BuildContext context) {
-    if (!_biometricLockEnabled || _unlocked) {
-      return MainScreen(
-        biometricLockEnabled: _biometricLockEnabled,
-        onToggleBiometricLock: _setLockEnabled,
-      );
-    }
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FC),
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
+    return Stack(
+      children: [
+        MainScreen(
+          biometricLockEnabled: _biometricLockEnabled,
+          onToggleBiometricLock: _setLockEnabled,
+        ),
+        if (_biometricLockEnabled && !_unlocked)
+          Positioned.fill(
+              child: Scaffold(
+              backgroundColor: const Color(0xFFF7F8FC),
+              body: SafeArea(
+              child: Center(
+              child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.fingerprint, size: 88, color: Color(0xFF356AE6)),
-                const SizedBox(height: 18),
-                const Text(
-                  'برنامه قفل است',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'برای ورود، اثر انگشت خود را تأیید کن.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.black54),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 14),
-                  Text(_error!, textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.redAccent)),
-                ],
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: _biometricLockEnabled
-                      ? FilledButton.icon(
-                          onPressed: _busy ? null : () => _setLockEnabled(false),
-                          icon: const Icon(Icons.lock),
-                          label: const Text('قفل فعال'),
-                        )
-                      : OutlinedButton.icon(
-                          onPressed: _busy ? null : () => _setLockEnabled(true),
-                          icon: const Icon(Icons.lock_open),
-                          label: const Text('قفل غیرفعال'),
-                        ),
-                ),
-                const SizedBox(height: 22),
-                FilledButton.icon(
-                  onPressed: _busy ? null : _authenticate,
-                  icon: _busy
-                      ? const SizedBox(
-                          width: 18, height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.lock_open),
-                  label: Text(_busy ? 'در حال بررسی...' : 'تلاش دوباره'),
-                ),
+              const Icon(Icons.fingerprint, size: 88, color: Color(0xFF356AE6)),
+              const SizedBox(height: 18),
+              const Text(
+              'برنامه قفل است',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+              'برای ورود، اثر انگشت خود را تأیید کن.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.black54),
+              ),
+              if (_error != null) ...[
+              const SizedBox(height: 14),
+              Text(_error!, textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.redAccent)),
               ],
-            ),
+              const SizedBox(height: 14),
+              SizedBox(
+              width: double.infinity,
+              child: _biometricLockEnabled
+              ? FilledButton.icon(
+              onPressed: _busy ? null : () => _setLockEnabled(false),
+              icon: const Icon(Icons.lock),
+              label: const Text('قفل فعال'),
+              )
+              : OutlinedButton.icon(
+              onPressed: _busy ? null : () => _setLockEnabled(true),
+              icon: const Icon(Icons.lock_open),
+              label: const Text('قفل غیرفعال'),
+              ),
+              ),
+              const SizedBox(height: 22),
+              FilledButton.icon(
+              onPressed: _busy ? null : _authenticate,
+              icon: _busy
+              ? const SizedBox(
+              width: 18, height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+              )
+              : const Icon(Icons.lock_open),
+              label: Text(_busy ? 'در حال بررسی...' : 'تلاش دوباره'),
+              ),
+              ],
+              ),
+              ),
+              ),
+              ),
+              ),
           ),
-        ),
-      ),
+      ],
     );
   }
 }
@@ -647,6 +652,8 @@ class _MainScreenState extends State<MainScreen> {
   ];
 
   int _selectedIndex = 0;
+  // Preserve the last valid bottom-navigation destination when Reports is open.
+  int _navigationSelectedIndex = 0;
   bool _activitiesGroupedView = true;
   String? _openedActivityFolder;
   Color _accentColor = _colors.first;
@@ -1495,8 +1502,11 @@ class _MainScreenState extends State<MainScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             NavigationBar(
-        selectedIndex: _selectedIndex == 2 ? -1 : (_selectedIndex == 3 ? 2 : _selectedIndex),
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index == 2 ? 3 : index),
+        selectedIndex: _navigationSelectedIndex,
+        onDestinationSelected: (index) => setState(() {
+          _navigationSelectedIndex = index;
+          _selectedIndex = index == 2 ? 3 : index;
+        }),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.add_circle_outline_rounded),
