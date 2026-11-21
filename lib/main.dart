@@ -774,7 +774,10 @@ class _MainScreenState extends State<MainScreen> {
               Expanded(child: TextField(controller: controller, decoration: const InputDecoration(hintText: 'نام پوشه جدید'))),
               IconButton(icon: const Icon(Icons.add_circle, color: Colors.green), onPressed: () {
                 final name = controller.text.trim();
-                if (name.isEmpty || _activityCategoryNames.contains(name)) return;
+                if (name.isEmpty || _activityCategoryNames.any((c) => c.toLowerCase() == name.toLowerCase())) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('نام پوشه خالی یا تکراری است.')));
+                  return;
+                }
                 setState(() { _activityCategoryNames.add(name); _activityCategoryNames.sort(); });
                 controller.clear(); refresh(() {});
                 _persistActivityCategoryNames();
@@ -784,13 +787,20 @@ class _MainScreenState extends State<MainScreen> {
             if (_activityCategoryNames.isEmpty) const Text('هنوز پوشه‌ای ایجاد نشده است.'),
             ..._activityCategoryNames.map((category) => ListTile(
               dense: true, title: Text(category),
+              subtitle: Text('${_activityNames.where((n) => (_activityCategories[n] ?? 'بدون پوشه') == category).length} فعالیت'),
               trailing: Wrap(children: [
                 IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () async {
                   final edited = await _askChecklistText(title: 'ویرایش پوشه', hint: 'نام پوشه', initial: category);
                   if (edited == null || edited.trim().isEmpty || !mounted) return;
+                  final newName = edited.trim();
+                  if (newName != category && _activityCategoryNames.any((c) => c.toLowerCase() == newName.toLowerCase())) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('پوشه‌ای با این نام وجود دارد.')));
+                    return;
+                  }
                   setState(() {
-                    _activityCategoryNames = _activityCategoryNames.map<String>((c) => c == category ? edited.trim() : c).toSet().toList()..sort();
-                    _activityCategories.updateAll((key, value) => value == category ? edited.trim() : value);
+                    _activityCategoryNames = _activityCategoryNames.map<String>((c) => c == category ? newName : c).toSet().toList()..sort();
+                    _activityCategories.updateAll((key, value) => value == category ? newName : value);
+                    if (_openedActivityFolder == category) _openedActivityFolder = newName;
                   });
                   await _persistActivityCategoryNames(); await _persistActivityCategories();
                   refresh(() {});
@@ -805,6 +815,7 @@ class _MainScreenState extends State<MainScreen> {
                   setState(() {
                     _activityCategoryNames.remove(category);
                     _activityCategories.updateAll((key, value) => value == category ? 'بدون پوشه' : value);
+                    if (_openedActivityFolder == category) _openedActivityFolder = null;
                   });
                   await _persistActivityCategoryNames(); await _persistActivityCategories();
                   refresh(() {});
