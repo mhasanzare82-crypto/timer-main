@@ -636,7 +636,7 @@ class _MainScreenState extends State<MainScreen> {
   static const _categoriesStorageKey = 'activity_categories_v1';
   static const _runningActivitiesStorageKey = 'running_activities_v1';
   static const _countdownsStorageKey = 'countdown_timers_v1';
-  static const _tabTitles = ['ثبت زمان', 'فعالیت‌ها', 'گزارش‌گیری', 'تایمر معکوس', 'زنگ هشدارها'];
+  static const _tabTitles = ['ثبت زمان', 'فعالیت‌ها', 'گزارش‌گیری', 'تایمر معکوس'];
   static const _colors = [
     Color(0xFF356AE6),
     Color(0xFF00897B),
@@ -1487,7 +1487,6 @@ class _MainScreenState extends State<MainScreen> {
           _buildActivitiesPage(),
           _buildReportsPage(),
           _buildCountdownPage(),
-          const _AlarmsPage(),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -1496,8 +1495,8 @@ class _MainScreenState extends State<MainScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             NavigationBar(
-        selectedIndex: _selectedIndex == 2 ? -1 : (_selectedIndex == 3 ? 2 : (_selectedIndex == 4 ? 3 : _selectedIndex)),
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index == 2 ? 3 : (index == 3 ? 4 : index)),
+        selectedIndex: _selectedIndex == 2 ? -1 : (_selectedIndex == 3 ? 2 : _selectedIndex),
+        onDestinationSelected: (index) => setState(() => _selectedIndex = index == 2 ? 3 : index,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.add_circle_outline_rounded),
@@ -1514,7 +1513,6 @@ class _MainScreenState extends State<MainScreen> {
             selectedIcon: Icon(Icons.hourglass_full_rounded),
             label: 'تایمر معکوس',
           ),
-          NavigationDestination(icon: Icon(Icons.alarm_outlined), selectedIcon: Icon(Icons.alarm), label: 'هشدارها'),
         ],
       ),
           ],
