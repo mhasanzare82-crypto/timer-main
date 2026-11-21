@@ -207,64 +207,64 @@ class _BiometricGateState extends State<_BiometricGate>
         ),
         if (_biometricLockEnabled && !_unlocked)
           Positioned.fill(
-              child: Scaffold(
-              backgroundColor: const Color(0xFFF7F8FC),
-              body: SafeArea(
-              child: Center(
+            child: Scaffold(
+          backgroundColor: const Color(0xFFF7F8FC),
+          body: SafeArea(
+            child: Center(
               child: Padding(
-              padding: const EdgeInsets.all(28),
-              child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-              const Icon(Icons.fingerprint, size: 88, color: Color(0xFF356AE6)),
-              const SizedBox(height: 18),
-              const Text(
-              'برنامه قفل است',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.fingerprint, size: 88, color: Color(0xFF356AE6)),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'برنامه قفل است',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'برای ورود، اثر انگشت خود را تأیید کن.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.black54),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 14),
+                      Text(_error!, textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.redAccent)),
+                    ],
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: _biometricLockEnabled
+                          ? FilledButton.icon(
+                              onPressed: _busy ? null : () => _setLockEnabled(false),
+                              icon: const Icon(Icons.lock),
+                              label: const Text('قفل فعال'),
+                            )
+                          : OutlinedButton.icon(
+                              onPressed: _busy ? null : () => _setLockEnabled(true),
+                              icon: const Icon(Icons.lock_open),
+                              label: const Text('قفل غیرفعال'),
+                            ),
+                    ),
+                    const SizedBox(height: 22),
+                    FilledButton.icon(
+                      onPressed: _busy ? null : _authenticate,
+                      icon: _busy
+                          ? const SizedBox(
+                              width: 18, height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.lock_open),
+                      label: Text(_busy ? 'در حال بررسی...' : 'تلاش دوباره'),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 8),
-              const Text(
-              'برای ورود، اثر انگشت خود را تأیید کن.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.black54),
-              ),
-              if (_error != null) ...[
-              const SizedBox(height: 14),
-              Text(_error!, textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.redAccent)),
-              ],
-              const SizedBox(height: 14),
-              SizedBox(
-              width: double.infinity,
-              child: _biometricLockEnabled
-              ? FilledButton.icon(
-              onPressed: _busy ? null : () => _setLockEnabled(false),
-              icon: const Icon(Icons.lock),
-              label: const Text('قفل فعال'),
-              )
-              : OutlinedButton.icon(
-              onPressed: _busy ? null : () => _setLockEnabled(true),
-              icon: const Icon(Icons.lock_open),
-              label: const Text('قفل غیرفعال'),
-              ),
-              ),
-              const SizedBox(height: 22),
-              FilledButton.icon(
-              onPressed: _busy ? null : _authenticate,
-              icon: _busy
-              ? const SizedBox(
-              width: 18, height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-              )
-              : const Icon(Icons.lock_open),
-              label: Text(_busy ? 'در حال بررسی...' : 'تلاش دوباره'),
-              ),
-              ],
-              ),
-              ),
-              ),
-              ),
-              ),
+            ),
+          ),
+                 ),
           ),
       ],
     );
