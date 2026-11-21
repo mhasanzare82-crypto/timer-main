@@ -1496,7 +1496,7 @@ class _MainScreenState extends State<MainScreen> {
           children: [
             NavigationBar(
         selectedIndex: _selectedIndex == 2 ? -1 : (_selectedIndex == 3 ? 2 : _selectedIndex),
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index == 2 ? 3 : index,
+        onDestinationSelected: (index) => setState(() => _selectedIndex = index == 2 ? 3 : index),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.add_circle_outline_rounded),
