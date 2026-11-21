@@ -502,6 +502,35 @@ class _ActivityDetailPageState extends State<_ActivityDetailPage> {
   }
 }
 
+
+class _SavedAlarm {
+ int id; String title; int hour,minute; DateTime date; List<int> weekdays; String? sound; bool enabled;
+ _SavedAlarm({required this.id,required this.title,required this.hour,required this.minute,required this.date,required this.weekdays,this.sound,this.enabled=true});
+ Map<String,dynamic> toJson()=>{'id':id,'title':title,'hour':hour,'minute':minute,'date':date.toIso8601String(),'weekdays':weekdays,'sound':sound,'enabled':enabled};
+ factory _SavedAlarm.fromJson(Map<String,dynamic> j)=>_SavedAlarm(id:j['id'] as int,title:j['title'] as String? ?? 'زنگ هشدار',hour:j['hour'] as int? ?? 8,minute:j['minute'] as int? ?? 0,date:DateTime.tryParse(j['date'] as String? ?? '')??DateTime.now(),weekdays:(j['weekdays'] as List? ?? []).map((x)=>x as int).toList(),sound:j['sound'] as String?,enabled:j['enabled'] as bool? ?? true);
+}
+class _AlarmsPage extends StatefulWidget { const _AlarmsPage(); @override State<_AlarmsPage> createState()=>_AlarmsPageState(); }
+class _AlarmsPageState extends State<_AlarmsPage>{
+ static const key='independent_alarms_v1'; final items=<_SavedAlarm>[]; final player=AudioPlayer(); bool loading=true;
+ @override void initState(){super.initState();load();}
+ @override void dispose(){player.dispose();super.dispose();}
+ Future<void> load()async{final p=await SharedPreferences.getInstance();final raw=p.getString(key);if(raw!=null){try{items.addAll((jsonDecode(raw) as List).map((x)=>_SavedAlarm.fromJson(Map<String,dynamic>.from(x))));}catch(_){}}if(mounted)setState(()=>loading=false);for(final a in items.where((a)=>a.enabled)){await schedule(a);}}
+ Future<void> save()async{final p=await SharedPreferences.getInstance();await p.setString(key,jsonEncode(items.map((a)=>a.toJson()).toList()));}
+ int nid(_SavedAlarm a,int d)=>700000+a.id*10+d;
+ Future<void> cancel(_SavedAlarm a)async{for(var d=0;d<=7;d++)await _notifications.cancel(nid(a,d));}
+ NotificationDetails details()=>const NotificationDetails(android:AndroidNotificationDetails('independent_alarm_channel','زنگ‌های مستقل',channelDescription:'زنگ هشدارهای شخصی',importance:Importance.max,priority:Priority.max,category:AndroidNotificationCategory.alarm,playSound:true,audioAttributesUsage:AudioAttributesUsage.alarm));
+ Future<void> schedule(_SavedAlarm a)async{await cancel(a);if(!a.enabled)return;final now=DateTime.now();if(a.weekdays.isEmpty){final dt=DateTime(a.date.year,a.date.month,a.date.day,a.hour,a.minute);if(!dt.isAfter(now))return;await _notifications.zonedSchedule(nid(a,0),a.title,'زمان هشدار فرا رسیده است',tz.TZDateTime.from(dt,tz.local),details(),androidScheduleMode:AndroidScheduleMode.exactAllowWhileIdle,payload:'personal-alarm:\${a.id}');}else{for(final wd in a.weekdays){var dt=DateTime(now.year,now.month,now.day,a.hour,a.minute);while(dt.weekday!=wd||!dt.isAfter(now)){dt=dt.add(const Duration(days:1));dt=DateTime(dt.year,dt.month,dt.day,a.hour,a.minute);}await _notifications.zonedSchedule(nid(a,wd),a.title,'زمان هشدار فرا رسیده است',tz.TZDateTime.from(dt,tz.local),details(),androidScheduleMode:AndroidScheduleMode.exactAllowWhileIdle,matchDateTimeComponents:DateTimeComponents.dayOfWeekAndTime,payload:'personal-alarm:\${a.id}');}}}
+ String time(_SavedAlarm a)=>'\${a.hour.toString().padLeft(2,'0')}:\${a.minute.toString().padLeft(2,'0')}';
+ String repeat(_SavedAlarm a)=>a.weekdays.isEmpty?'یک‌بار • \${a.date.year}/\${a.date.month}/\${a.date.day}':a.weekdays.map((d)=>['','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه','یکشنبه'][d]).join('، ');
+ Future<void> edit(_SavedAlarm? old)async{final ctl=TextEditingController(text:old?.title??'');var h=old?.hour??8,m=old?.minute??0,dt=old?.date??DateTime.now();var days=[...(old?.weekdays??[])];var sound=old?.sound;const labels=['دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه','یکشنبه'];
+ final ok=await showDialog<bool>(context:context,builder:(ctx)=>StatefulBuilder(builder:(ctx,upd)=>AlertDialog(title:Text(old==null?'زنگ جدید':'ویرایش زنگ'),content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[TextField(controller:ctl,decoration:const InputDecoration(labelText:'عنوان')),ListTile(title:Text('ساعت \${h.toString().padLeft(2,'0')}:\${m.toString().padLeft(2,'0')}'),onTap:()async{final t=await showTimePicker(context:ctx,initialTime:TimeOfDay(hour:h,minute:m));if(t!=null)upd(() {h=t.hour;m=t.minute;});}),ListTile(title:Text('تاریخ \${dt.year}/\${dt.month}/\${dt.day}'),onTap:()async{final d=await showDatePicker(context:ctx,initialDate:dt.isBefore(DateTime.now())?DateTime.now():dt,firstDate:DateTime.now(),lastDate:DateTime(2100));if(d!=null)upd(()=>dt=d);}),const Text('تکرار هفتگی (برای یک‌بار روزها را خالی بگذار)'),Wrap(children:List.generate(7,(i)=>FilterChip(label:Text(labels[i]),selected:days.contains(i+1),onSelected:(v)=>upd(()=>v?days.add(i+1):days.remove(i+1))))),OutlinedButton.icon(onPressed:()async{final f=await FilePicker.pickFile(type:FileType.audio);if(f?.path==null)return;final dir=await getApplicationSupportDirectory();final ext=f!.path!.split('.').last;final dest=File('\${dir.path}/personal_alarm_\${old?.id??DateTime.now().millisecondsSinceEpoch}.$ext');await File(f.path!).copy(dest.path);sound=dest.path;upd((){});},icon:const Icon(Icons.music_note),label:Text(sound==null?'انتخاب فایل زنگ':'تغییر فایل زنگ')),if(sound!=null)TextButton.icon(onPressed:()async{await player.stop();await player.play(DeviceFileSource(sound!));},icon:const Icon(Icons.play_arrow),label:const Text('پیش‌نمایش زنگ')),const Text('فایل زنگ برای هر هشدار جدا ذخیره می‌شود. اعلان زمان‌بندی‌شده در پس‌زمینه از صدای اعلان سیستم استفاده می‌کند.',style:TextStyle(fontSize:12,color:Colors.black54))])),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('لغو')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('ذخیره'))])));
+ if(ok!=true)return;final a=old??_SavedAlarm(id:DateTime.now().millisecondsSinceEpoch%1000000,title:'',hour:h,minute:m,date:dt,weekdays:days);a.title=ctl.text.trim().isEmpty?'زنگ هشدار':ctl.text.trim();a.hour=h;a.minute=m;a.date=dt;a.weekdays=[...days]..sort();a.sound=sound;if(old==null)items.add(a);await save();await schedule(a);if(mounted)setState((){});
+ }
+ Future<void> toggle(_SavedAlarm a,bool v)async{a.enabled=v;await save();await schedule(a);setState((){});}
+ Future<void> remove(_SavedAlarm a)async{await cancel(a);items.remove(a);await save();setState((){});}
+ @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('زنگ هشدارها')),floatingActionButton:FloatingActionButton.extended(onPressed:()=>edit(null),icon:const Icon(Icons.add_alarm),label:const Text('زنگ جدید')),body:loading?const Center(child:CircularProgressIndicator()):items.isEmpty?const Center(child:Text('هنوز زنگی ثبت نشده است.')):ListView.builder(padding:const EdgeInsets.all(12),itemCount:items.length,itemBuilder:(ctx,i){final a=items[i];return Card(child:ListTile(leading:Icon(Icons.alarm,color:a.enabled?Theme.of(context).colorScheme.primary:Colors.grey),title:Text(time(a),textDirection:TextDirection.ltr,style:const TextStyle(fontSize:23,fontWeight:FontWeight.bold)),subtitle:Text('\${a.title}\\n\${repeat(a)}\${a.sound==null?'':'\\nفایل زنگ ذخیره شده'}'),isThreeLine:true,trailing:Wrap(children:[Switch(value:a.enabled,onChanged:(v)=>toggle(a,v)),IconButton(icon:const Icon(Icons.edit),onPressed:()=>edit(a)),IconButton(icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>remove(a))])));}));
+}
+
 class MainScreen extends StatefulWidget {
   final bool biometricLockEnabled;
   final Future<void> Function(bool) onToggleBiometricLock;
@@ -517,7 +546,7 @@ class _MainScreenState extends State<MainScreen> {
   static const _categoriesStorageKey = 'activity_categories_v1';
   static const _runningActivitiesStorageKey = 'running_activities_v1';
   static const _countdownsStorageKey = 'countdown_timers_v1';
-  static const _tabTitles = ['ثبت زمان', 'فعالیت‌ها', 'گزارش‌گیری', 'تایمر معکوس'];
+  static const _tabTitles = ['ثبت زمان', 'فعالیت‌ها', 'گزارش‌گیری', 'تایمر معکوس', 'زنگ هشدارها'];
   static const _colors = [
     Color(0xFF356AE6),
     Color(0xFF00897B),
@@ -1356,6 +1385,7 @@ class _MainScreenState extends State<MainScreen> {
           _buildActivitiesPage(),
           _buildReportsPage(),
           _buildCountdownPage(),
+          const _AlarmsPage(),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -1364,8 +1394,8 @@ class _MainScreenState extends State<MainScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             NavigationBar(
-        selectedIndex: _selectedIndex == 2 ? -1 : (_selectedIndex == 3 ? 2 : _selectedIndex),
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index == 2 ? 3 : index),
+        selectedIndex: _selectedIndex == 2 ? -1 : (_selectedIndex == 3 ? 2 : (_selectedIndex == 4 ? 3 : _selectedIndex)),
+        onDestinationSelected: (index) => setState(() => _selectedIndex = index == 2 ? 3 : (index == 3 ? 4 : index)),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.add_circle_outline_rounded),
@@ -1382,6 +1412,7 @@ class _MainScreenState extends State<MainScreen> {
             selectedIcon: Icon(Icons.hourglass_full_rounded),
             label: 'تایمر معکوس',
           ),
+          NavigationDestination(icon: Icon(Icons.alarm_outlined), selectedIcon: Icon(Icons.alarm), label: 'هشدارها'),
         ],
       ),
           ],
