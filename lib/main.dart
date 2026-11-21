@@ -2386,7 +2386,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _buildActivitiesPage() {
-    final folders=_activityCategoryNames.where((folder)=>_activityNames.any((name)=>(_activityCategories[name]??'بدون پوشه')==folder)).toList();
+    final folders=[..._activityCategoryNames];
     final visible=_openedActivityFolder==null?_activityNames.where((n)=>(_activityCategories[n]??'بدون پوشه')=='بدون پوشه').toList():_activityNames.where((n)=>(_activityCategories[n]??'بدون پوشه')==_openedActivityFolder).toList();
     return ListView(padding:const EdgeInsets.all(16),children:[
       Row(children:[const Expanded(child:Text('فهرست فعالیت‌ها',style:TextStyle(fontSize:19,fontWeight:FontWeight.bold))),FilledButton.icon(onPressed:_addActivityToCatalog,icon:const Icon(Icons.add,size:19),label:const Text('فعالیت جدید'),style:FilledButton.styleFrom(backgroundColor:_accentColor))]),
