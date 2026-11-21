@@ -11,6 +11,15 @@ on:
       - 'pubspec.yaml'
       - 'pubspec.lock'
       - '.github/workflows/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'lib/**'
+      - 'android/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/**'
 
 permissions:
   contents: read
