@@ -31,7 +31,7 @@ class _ReminderEditorState extends State<_ReminderEditor> {
   @override Widget build(BuildContext context)=>AlertDialog(
     title:Text(widget.original==null?'یادآوری جدید':'ویرایش یادآوری'),
     content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.stretch,children:[
-      TextField(controller:_text,minLines:3,maxLines:5,decoration:const InputDecoration(labelText:'متن یادآوری',border:OutlineInputBorder())),
+      TextField(controller:_text,minLines:3,maxLines:5,onChanged:(_)=>setState((){}),decoration:const InputDecoration(labelText:'متن یادآوری',border:OutlineInputBorder())),
       const SizedBox(height:12),
       DropdownButtonFormField<String>(key:ValueKey(_repeat),value:_repeat,decoration:const InputDecoration(labelText:'تکرار'),items:const [DropdownMenuItem(value:'once',child:Text('یک‌بار')),DropdownMenuItem(value:'daily',child:Text('هر روز')),DropdownMenuItem(value:'weekly',child:Text('روزهای هفته'))],onChanged:(v){if(v!=null)setState(()=>_repeat=v);}),
       Visibility(visible:_repeat=='once',maintainState:true,child:TextField(controller:_date,decoration:const InputDecoration(labelText:'تاریخ شمسی (سال/ماه/روز)'))),
