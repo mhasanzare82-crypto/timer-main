@@ -66,6 +66,7 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
     while(!d.isAfter(now)||(weekday!=null&&d.weekday!=weekday)){d=d.add(const Duration(days:1));d=DateTime(d.year,d.month,d.day,h,m);}return d;
   }
   Future<void> _schedule(_Reminder r) async {
+    try {
     await _cancel(r);if(!_ready||!r.enabled)return;
     Future<void> add(int suffix,DateTime date,DateTimeComponents? match) async {
       await _plugin.zonedSchedule(_nid(r,suffix),'یادآوری روزانه',r.text,tz.TZDateTime.from(date,tz.local),_details,androidScheduleMode:AndroidScheduleMode.exactAllowWhileIdle,matchDateTimeComponents:match,payload:'daily-reminder:${r.id}');
@@ -73,6 +74,10 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
     if(r.repeat=='once'){final d=_date(r);if(d==null)return;final at=DateTime(d.year,d.month,d.day,r.hour,r.minute);if(at.isAfter(DateTime.now()))await add(0,at,null);}
     else if(r.repeat=='daily'){await add(0,_next(r.hour,r.minute),DateTimeComponents.time);}
     else {for(final day in r.days){await add(day,_next(r.hour,r.minute,day),DateTimeComponents.dayOfWeekAndTime);}}
+    } catch(e) {
+      debugPrint('Could not schedule daily reminder ${r.id}: $e');
+      if(mounted) setState(()=>_ready=false);
+    }
   }
   Future<void> _edit([_Reminder? old]) async {
     final text=TextEditingController(text:old?.text??'');
