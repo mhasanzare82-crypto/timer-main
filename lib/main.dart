@@ -383,19 +383,22 @@ class _CountdownTimer {
   final int totalSeconds;
   int remainingSeconds;
   DateTime? endsAt;
+  DateTime? startedAt;
+  bool completionLogged = false;
   bool running = false;
   bool finished = false;
   String? alarmSoundPath;
 
   _CountdownTimer({
     required this.id, required this.title, required this.totalSeconds,
-    int? remainingSeconds, this.endsAt, this.running = false, this.finished = false,
-    this.alarmSoundPath,
+    int? remainingSeconds, this.endsAt, this.startedAt, this.completionLogged = false,
+    this.running = false, this.finished = false, this.alarmSoundPath,
   }) : remainingSeconds = remainingSeconds ?? totalSeconds;
 
   Map<String, dynamic> toJson() => {
     'id': id, 'title': title, 'totalSeconds': totalSeconds,
     'remainingSeconds': remainingSeconds, 'endsAt': endsAt?.millisecondsSinceEpoch,
+    'startedAt': startedAt?.millisecondsSinceEpoch, 'completionLogged': completionLogged,
     'running': running, 'finished': finished, 'alarmSoundPath': alarmSoundPath,
   };
 
@@ -407,6 +410,8 @@ class _CountdownTimer {
       totalSeconds: json['totalSeconds'] as int,
       remainingSeconds: json['remainingSeconds'] as int?,
       endsAt: endsAtMs == null ? null : DateTime.fromMillisecondsSinceEpoch(endsAtMs),
+      startedAt: (json['startedAt'] as int?) == null ? null : DateTime.fromMillisecondsSinceEpoch(json['startedAt'] as int),
+      completionLogged: json['completionLogged'] as bool? ?? false,
       running: json['running'] as bool? ?? false,
       finished: json['finished'] as bool? ?? false,
       alarmSoundPath: json['alarmSoundPath'] as String?,
