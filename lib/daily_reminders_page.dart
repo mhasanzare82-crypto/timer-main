@@ -76,7 +76,7 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
         DropdownButtonFormField<String>(value:repeat,decoration:const InputDecoration(labelText:'تکرار'),items:const [DropdownMenuItem(value:'once',child:Text('یک‌بار')),DropdownMenuItem(value:'daily',child:Text('هر روز')),DropdownMenuItem(value:'weekly',child:Text('روزهای هفته'))],onChanged:(v)=>refresh(()=>repeat=v??repeat)),
         if(repeat=='once') TextFormField(initialValue:date,decoration:const InputDecoration(labelText:'تاریخ شمسی (سال/ماه/روز)'),onChanged:(v)=>date=v),
         if(repeat=='weekly') Wrap(spacing:4,children:List.generate(7,(i)=>FilterChip(label:Text(['دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه','یکشنبه'][i]),selected:days.contains(i+1),onSelected:(v)=>refresh(()=>v?days.add(i+1):days.remove(i+1))))),
-        ListTile(contentPadding:EdgeInsets.zero,title:Text('ساعت ${hour.toString().padLeft(2,'0')}:${minute.toString().padLeft(2,'0')}'),leading:const Icon(Icons.access_time),onTap:()async{final t=await showTimePicker(context:ctx,initialTime:TimeOfDay(hour:hour,minute:minute));if(t!=null)refresh(()=>{hour=t.hour,minute=t.minute});}),
+        ListTile(contentPadding:EdgeInsets.zero,title:Text('ساعت ${hour.toString().padLeft(2,'0')}:${minute.toString().padLeft(2,'0')}'),leading:const Icon(Icons.access_time),onTap:()async{final t=await showTimePicker(context:ctx,initialTime:TimeOfDay(hour:hour,minute:minute));if(t!=null)refresh(() { hour=t.hour; minute=t.minute; });}),
       ])),
       actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('لغو')),FilledButton(onPressed:()=>Navigator.pop(ctx,text.text.trim().isNotEmpty&&(repeat!='weekly'||days.isNotEmpty)),child:const Text('ذخیره'))],
     )));
