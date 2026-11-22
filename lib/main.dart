@@ -17,6 +17,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'daily_reminders_page.dart';
 
 final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
 
@@ -700,7 +701,7 @@ class _MainScreenState extends State<MainScreen> {
   static const _categoriesStorageKey = 'activity_categories_v1';
   static const _runningActivitiesStorageKey = 'running_activities_v1';
   static const _countdownsStorageKey = 'countdown_timers_v1';
-  static const _tabTitles = ['ثبت زمان', 'فعالیت‌ها', 'گزارش‌گیری', 'تایمر معکوس'];
+  static const _tabTitles = ['ثبت زمان', 'فعالیت‌ها', 'گزارش‌گیری', 'تایمر معکوس', 'یادآوری‌های روزانه'];
   static const _colors = [
     Color(0xFF356AE6),
     Color(0xFF00897B),
@@ -1551,6 +1552,7 @@ class _MainScreenState extends State<MainScreen> {
           _buildActivitiesPage(),
           _buildReportsPage(),
           _buildCountdownPage(),
+          const DailyRemindersPage(),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -1559,8 +1561,8 @@ class _MainScreenState extends State<MainScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             NavigationBar(
-        selectedIndex: _selectedIndex == 3 ? 2 : (_selectedIndex == 2 ? 1 : _selectedIndex),
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index == 2 ? 3 : index),
+        selectedIndex: _selectedIndex >= 3 ? _selectedIndex - 1 : (_selectedIndex == 2 ? 1 : _selectedIndex),
+        onDestinationSelected: (index) => setState(() => _selectedIndex = index >= 2 ? index + 1 : index),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.add_circle_outline_rounded),
@@ -1576,6 +1578,11 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.hourglass_bottom_rounded),
             selectedIcon: Icon(Icons.hourglass_full_rounded),
             label: 'تایمر معکوس',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.notifications_active_outlined),
+            selectedIcon: Icon(Icons.notifications_active_rounded),
+            label: 'یادآوری‌ها',
           ),
         ],
       ),
