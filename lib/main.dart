@@ -87,6 +87,9 @@ class _BiometricGateState extends State<_BiometricGate>
   @override
   void initState() {
     super.initState();
+    _hoursWheelController = FixedExtentScrollController(initialItem: _wheelHours);
+    _minutesWheelController = FixedExtentScrollController(initialItem: _wheelMinutes);
+    _secondsWheelController = FixedExtentScrollController(initialItem: _wheelSeconds);
     WidgetsBinding.instance.addObserver(this);
     _loadLockSetting();
   }
@@ -726,6 +729,9 @@ class _MainScreenState extends State<MainScreen> {
   final List<_CountdownTimer> _countdowns=[];
   Timer? _countdownTicker;
   int _wheelHours=0, _wheelMinutes=5, _wheelSeconds=0, _nextCountdownId=1000;
+  late final FixedExtentScrollController _hoursWheelController;
+  late final FixedExtentScrollController _minutesWheelController;
+  late final FixedExtentScrollController _secondsWheelController;
   bool _countdownAlarmEnabled = true;
   bool _countdownAlarmSound = true;
   bool _countdownAlarmVibration = true;
@@ -756,6 +762,9 @@ class _MainScreenState extends State<MainScreen> {
     _clock?.cancel();
     _countdownTicker?.cancel();
     _customAlarmPlayer.dispose();
+    _hoursWheelController.dispose();
+    _minutesWheelController.dispose();
+    _secondsWheelController.dispose();
     for (final activity in _runningActivities) {
       activity.dispose();
     }
@@ -2438,7 +2447,7 @@ class _MainScreenState extends State<MainScreen> {
     final h=seconds~/3600,m=(seconds%3600)~/60,s=seconds%60;
     return _persianDigits(_twoDigits(h)+':'+_twoDigits(m)+':'+_twoDigits(s));
   }
-  Widget _wheelPicker(String label, int max, int selected, ValueChanged<int> onChanged) {
+  Widget _wheelPicker(String label, int max, int selected, FixedExtentScrollController controller, ValueChanged<int> onChanged) {
     return Expanded(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -2453,7 +2462,7 @@ class _MainScreenState extends State<MainScreen> {
               diameterRatio: 1.5,
               physics: const FixedExtentScrollPhysics(),
               onSelectedItemChanged: onChanged,
-              controller: FixedExtentScrollController(initialItem: selected),
+              controller: controller,
               childDelegate: ListWheelChildBuilderDelegate(
                 childCount: max + 1,
                 builder: (context, index) => Center(
@@ -2483,9 +2492,9 @@ class _MainScreenState extends State<MainScreen> {
       Container(padding:const EdgeInsets.all(12),decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(20)),
         child:Column(children:[
           Row(children:[
-            _wheelPicker('ساعت',99,_wheelHours,(v)=>setState(()=>_wheelHours=v)),
-            _wheelPicker('دقیقه',59,_wheelMinutes,(v)=>setState(()=>_wheelMinutes=v)),
-            _wheelPicker('ثانیه',59,_wheelSeconds,(v)=>setState(()=>_wheelSeconds=v)),
+            _wheelPicker('ساعت',99,_wheelHours,_hoursWheelController,(v)=>setState(()=>_wheelHours=v)),
+            _wheelPicker('دقیقه',59,_wheelMinutes,_minutesWheelController,(v)=>setState(()=>_wheelMinutes=v)),
+            _wheelPicker('ثانیه',59,_wheelSeconds,_secondsWheelController,(v)=>setState(()=>_wheelSeconds=v)),
           ]),
           Text(_countdownText(selectedSeconds),style:TextStyle(fontSize:24,fontWeight:FontWeight.bold,color:_accentColor)),
           const SizedBox(height:12),
