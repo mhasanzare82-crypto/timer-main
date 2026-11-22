@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -331,8 +332,12 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
               ? extension
               : '.audio';
 
-      final fileName =
-          'reminder_${reminderId}_${DateTime.now().microsecondsSinceEpoch}$safeExtension';
+      final random = math.Random.secure();
+      final token = List.generate(
+        16,
+        (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+      ).join();
+      final fileName = 'reminder_${reminderId}_${token}$safeExtension';
       final destination = '${soundDirectory.path}/$fileName';
       await File(sourcePath).copy(destination);
       return destination;
