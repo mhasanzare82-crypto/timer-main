@@ -308,15 +308,13 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
 
   Future<String?> _pickReminderSound(int reminderId) async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.audio,
-        allowMultiple: false,
-      );
-      if (result == null) return null;
+      // file_picker 12+ exposes static APIs and returns a PlatformFile directly.
+      final selected = await FilePicker.pickFile(type: FileType.audio);
+      if (selected == null) return null;
 
-      final sourcePath = result.files.single.path;
-      if (sourcePath == null) {
-        throw StateError('The selected audio file has no readable path.');
+      final audioBytes = await selected.readAsBytes();
+      if (audioBytes.isEmpty) {
+        throw StateError('The selected audio file is empty or unreadable.');
       }
 
       final supportDirectory = await getApplicationSupportDirectory();
@@ -324,11 +322,11 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
           Directory('${supportDirectory.path}/reminder_sounds');
       await soundDirectory.create(recursive: true);
 
-      final sourceName = sourcePath.split('/').last;
+      final sourceName = selected.name;
       final dot = sourceName.lastIndexOf('.');
       final extension = dot >= 0 ? sourceName.substring(dot) : '.audio';
       final safeExtension =
-          RegExp(r'^\.[a-zA-Z0-9]{1,8}$').hasMatch(extension)
+          RegExp(r'^\\.[a-zA-Z0-9]{1,8}$').hasMatch(extension)
               ? extension
               : '.audio';
 
@@ -337,9 +335,9 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
         16,
         (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
       ).join();
-      final fileName = 'reminder_${reminderId}_${token}$safeExtension';
-      final destination = '${soundDirectory.path}/$fileName';
-      await File(sourcePath).copy(destination);
+      final fileName = 'reminder_${reminderId}_${token}${safeExtension}';
+      final destination = '${soundDirectory.path}/${fileName}';
+      await File(destination).writeAsBytes(audioBytes, flush: true);
       return destination;
     } catch (error) {
       debugPrint('Could not select reminder sound: $error');
