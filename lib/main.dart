@@ -2279,7 +2279,37 @@ class _MainScreenState extends State<MainScreen> {
     if(changed&&mounted)setState((){});
     if (completed) _persistCountdowns();
   }
+  Future<void> _recordCountdownCompletion(_CountdownTimer item) async {
+    if (item.completionLogged) return;
+    final completedAt = _programNow;
+    final startedAt = item.startedAt ?? completedAt.subtract(Duration(seconds: item.totalSeconds));
+    final name = item.title.trim().isEmpty ? 'تایمر' : item.title.trim();
+    item.completionLogged = true;
+    final saved = _SavedActivity(
+      name: name,
+      startDate: _jalaliDate(startedAt),
+      startTime: _clockTime(startedAt),
+      endDate: _jalaliDate(completedAt),
+      endTime: _clockTime(completedAt),
+      durationSeconds: item.totalSeconds,
+    );
+    if (!mounted) return;
+    setState(() {
+      _savedActivities.insert(0, saved);
+      if (!_activityNames.contains(name)) {
+        _activityNames.add(name);
+        _activityNames.sort();
+      }
+      _activityCategories.putIfAbsent(name, () => 'بدون پوشه');
+    });
+    await _persistActivities();
+    await _persistActivityNames();
+    await _persistActivityCategories();
+    await _persistCountdowns();
+  }
+
   Future<void> _finishCountdown(_CountdownTimer item) async {
+    await _recordCountdownCompletion(item);
     await _notifications.cancel(item.id);
     if (_countdownAlarmEnabled) {
       await _notifications.show(item.id,'پایان تایمر','زمان «'+item.title+'» به پایان رسید.',_alarmDetails,payload:'countdown:'+item.id.toString());
@@ -2344,7 +2374,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _startCountdown(_CountdownTimer item) async {
     if(item.running||item.remainingSeconds<=0)return;
-    setState(() { item.running=true; item.finished=false; item.endsAt=DateTime.now().add(Duration(seconds:item.remainingSeconds)); });
+    setState(() { item.running=true; item.finished=false; item.completionLogged=false; item.startedAt ??= _programNow; item.endsAt=DateTime.now().add(Duration(seconds:item.remainingSeconds)); });
     await _persistCountdowns();
     await _scheduleCountdownAlarm(item);
   }
@@ -2357,7 +2387,7 @@ class _MainScreenState extends State<MainScreen> {
   }
   Future<void> _stopCountdown(_CountdownTimer item) async {
     await _notifications.cancel(item.id);
-    setState(() { item.running=false; item.finished=false; item.endsAt=null; item.remainingSeconds=item.totalSeconds; });
+    setState(() { item.running=false; item.finished=false; item.endsAt=null; item.startedAt=null; item.completionLogged=false; item.remainingSeconds=item.totalSeconds; });
     await _persistCountdowns();
   }
   String _countdownText(int seconds){
