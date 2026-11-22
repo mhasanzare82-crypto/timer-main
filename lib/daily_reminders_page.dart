@@ -326,7 +326,7 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
       final dot = sourceName.lastIndexOf('.');
       final extension = dot >= 0 ? sourceName.substring(dot) : '.audio';
       final safeExtension =
-          RegExp(r'^\.[a-zA-Z0-9]{1,8}.hasMatch(extension)
+          RegExp(r'^\.[a-zA-Z0-9]{1,8}$').hasMatch(extension)
               ? extension
               : '.audio';
 
