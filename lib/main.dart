@@ -87,9 +87,6 @@ class _BiometricGateState extends State<_BiometricGate>
   @override
   void initState() {
     super.initState();
-    _hoursWheelController = FixedExtentScrollController(initialItem: _wheelHours);
-    _minutesWheelController = FixedExtentScrollController(initialItem: _wheelMinutes);
-    _secondsWheelController = FixedExtentScrollController(initialItem: _wheelSeconds);
     WidgetsBinding.instance.addObserver(this);
     _loadLockSetting();
   }
@@ -747,6 +744,9 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    _hoursWheelController = FixedExtentScrollController(initialItem: _wheelHours);
+    _minutesWheelController = FixedExtentScrollController(initialItem: _wheelMinutes);
+    _secondsWheelController = FixedExtentScrollController(initialItem: _wheelSeconds);
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _now = _programNow);
     });
