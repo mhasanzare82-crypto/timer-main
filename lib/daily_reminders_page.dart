@@ -80,5 +80,49 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
   Future<void> _toggle(_Reminder r,bool value)async{if(_busy)return;final i=_items.indexWhere((e)=>e.id==r.id);if(i<0)return;_busy=true;try{final changed=_copy(r,enabled:value);final proposed=List<_Reminder>.of(_items)..[i]=changed;if(!await _persist(proposed)){_snack('تغییر ذخیره نشد؛ وضعیت قبلی حفظ شد.');return;}if(!mounted)return;setState(()=>_items..clear()..addAll(proposed));if(!await _schedule(changed))_snack('تغییر ذخیره شد اما اعلان به‌روزرسانی نشد.');}finally{_busy=false;}}
   Future<void> _delete(_Reminder r)async{if(_busy)return;_busy=true;try{final proposed=List<_Reminder>.of(_items)..removeWhere((e)=>e.id==r.id);if(!await _persist(proposed)){_snack('حذف ذخیره نشد؛ یادآور حفظ شد.');return;}if(!mounted)return;setState(()=>_items..clear()..addAll(proposed));await _cancel(r);}finally{_busy=false;}}
   String _repeat(_Reminder r){if(r.repeat=='daily')return 'هر روز';if(r.repeat=='weekly'){const names=['','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه','یکشنبه'];return r.days.where((d)=>d>0&&d<8).map((d)=>names[d]).join('، ');}return 'یک‌بار • ${r.date}';}
-  @override Widget build(BuildContext context)=>Scaffold(floatingActionButton:FloatingActionButton.extended(onPressed:_busy||_loading?null:()=>_edit(),icon:const Icon(Icons.add_alert),label:const Text('یادآوری جدید')),body:_loading?const Center(child:CircularProgressIndicator()):_items.isEmpty?const Center(child:Text('هنوز یادآوری‌ای ثبت نکرده‌ای.')):ListView(padding:const EdgeInsets.fromLTRB(12,12,12,90),children:[if(!_ready)const Text('مجوز اعلان و زمان‌بندی دقیق را در تنظیمات گوشی بررسی کن.',style:TextStyle(color:Colors.red)),..._items.map((r)=>Card(child:ListTile(isThreeLine:true,title:Text(r.text,maxLines:4,overflow:TextOverflow.ellipsis),subtitle:Text('${r.hour.toString().padLeft(2,'0')}:${r.minute.toString().padLeft(2,'0')} • ${_repeat(r)}'),leading:Switch(value:r.enabled,onChanged:_busy?null:(v)=>_toggle(r,v)),trailing:PopupMenuButton<String>(enabled:!_busy,onSelected:(v)=>v=='edit'?_edit(r):_delete(r),itemBuilder:(_)=>const [PopupMenuItem(value:'edit',child:Text('ویرایش')),PopupMenuItem(value:'delete',child:Text('حذف'))]))))]);}
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _busy || _loading ? null : () => _edit(),
+        icon: const Icon(Icons.add_alert),
+        label: const Text('یادآوری جدید'),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _items.isEmpty
+              ? const Center(child: Text('هنوز یادآوری‌ای ثبت نکرده‌ای.'))
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 90),
+                  children: [
+                    if (!_ready)
+                      const Text(
+                        'مجوز اعلان و زمان‌بندی دقیق را در تنظیمات گوشی بررسی کن.',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ..._items.map((r) => Card(
+                          child: ListTile(
+                            isThreeLine: true,
+                            title: Text(r.text, maxLines: 4, overflow: TextOverflow.ellipsis),
+                            subtitle: Text(
+                              '${r.hour.toString().padLeft(2, '0')}:${r.minute.toString().padLeft(2, '0')} • ${_repeat(r)}',
+                            ),
+                            leading: Switch(
+                              value: r.enabled,
+                              onChanged: _busy ? null : (v) => _toggle(r, v),
+                            ),
+                            trailing: PopupMenuButton<String>(
+                              enabled: !_busy,
+                              onSelected: (v) => v == 'edit' ? _edit(r) : _delete(r),
+                              itemBuilder: (_) => const [
+                                PopupMenuItem(value: 'edit', child: Text('ویرایش')),
+                                PopupMenuItem(value: 'delete', child: Text('حذف')),
+                              ],
+                            ),
+                          ),
+                        )),
+                  ],
+                ),
+    );
+  }
 }
