@@ -32,10 +32,8 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
       final zone=await _zone.invokeMethod<String>('getLocalTimezone');
       if(zone!=null && zone.isNotEmpty) tz.setLocalLocation(tz.getLocation(zone));
       final android=_plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-      final notificationsGranted = await android?.requestNotificationsPermission();
-      final exactAlarmsGranted = await android?.requestExactAlarmsPermission();
       await android?.createNotificationChannel(const AndroidNotificationChannel('daily_reminders_channel','یادآوری‌های روزانه',description:'اعلان متن یادآوری‌ها',importance:Importance.max));
-      _ready=(notificationsGranted ?? true) && (exactAlarmsGranted ?? true);
+      _ready=true;
     } catch(e){debugPrint('Reminder notification setup: $e');}
     final prefs=await SharedPreferences.getInstance();
     try { final raw=prefs.getString(_key); if(raw!=null) _items.addAll((jsonDecode(raw) as List).map((e)=>_Reminder.fromJson(Map<String,dynamic>.from(e)))); } catch(e){debugPrint('Reminder storage: $e');}
