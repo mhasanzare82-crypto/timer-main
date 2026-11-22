@@ -32,13 +32,26 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
       final zone=await _zone.invokeMethod<String>('getLocalTimezone');
       if(zone!=null && zone.isNotEmpty) tz.setLocalLocation(tz.getLocation(zone));
       final android=_plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-      await android?.requestNotificationsPermission();
-      await android?.requestExactAlarmsPermission();
+      final notificationsGranted = await android?.requestNotificationsPermission();
+      final exactAlarmsGranted = await android?.requestExactAlarmsPermission();
       await android?.createNotificationChannel(const AndroidNotificationChannel('daily_reminders_channel','یادآوری‌های روزانه',description:'اعلان متن یادآوری‌ها',importance:Importance.max));
-      _ready=true;
+      _ready=(notificationsGranted ?? true) && (exactAlarmsGranted ?? true);
     } catch(e){debugPrint('Reminder notification setup: $e');}
     final prefs=await SharedPreferences.getInstance();
     try { final raw=prefs.getString(_key); if(raw!=null) _items.addAll((jsonDecode(raw) as List).map((e)=>_Reminder.fromJson(Map<String,dynamic>.from(e)))); } catch(e){debugPrint('Reminder storage: $e');}
+    final now=DateTime.now();
+    var expiredOnce=false;
+    for(var i=0;i<_items.length;i++) {
+      final r=_items[i];
+      if(r.enabled && r.repeat=='once') {
+        final d=_date(r);
+        if(d==null || !DateTime(d.year,d.month,d.day,r.hour,r.minute).isAfter(now)) {
+          _items[i]=_Reminder(r.id,r.text,r.repeat,r.date,r.hour,r.minute,r.days,false);
+          expiredOnce=true;
+        }
+      }
+    }
+    if(expiredOnce) await _save();
     if(mounted)setState(()=>_loading=false);
     if(_ready) for(final item in _items.where((e)=>e.enabled)) { await _schedule(item); }
   }
@@ -81,7 +94,13 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
       actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('لغو')),FilledButton(onPressed:()=>Navigator.pop(ctx,text.text.trim().isNotEmpty&&(repeat!='weekly'||days.isNotEmpty)),child:const Text('ذخیره'))],
     )));
     final value=text.text.trim();text.dispose();if(result!=true||!mounted)return;
-    if(repeat=='once'){final d=_date(_Reminder(0,'','once',date,0,0,[],true));if(d==null)return;}
+    if(repeat=='once'){
+      final d=_date(_Reminder(0,'','once',date,0,0,[],true));
+      if(d==null || !DateTime(d.year,d.month,d.day,hour,minute).isAfter(DateTime.now())) {
+        if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تاریخ و ساعت باید در آینده باشد و تاریخ شمسی معتبر وارد شود.')));
+        return;
+      }
+    }
     final id=old?.id??(DateTime.now().microsecondsSinceEpoch%10000000);
     final r=_Reminder(id,value,repeat,date,hour,minute,days.toList()..sort(),old?.enabled??true);
     final i=_items.indexWhere((e)=>e.id==id);setState(()=>i<0?_items.add(r):_items[i]=r);await _save();await _schedule(r);
