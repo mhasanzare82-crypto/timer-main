@@ -1582,7 +1582,7 @@ class _MainScreenState extends State<MainScreen> {
           NavigationDestination(
             icon: Icon(Icons.notifications_active_outlined),
             selectedIcon: Icon(Icons.notifications_active_rounded),
-            label: 'یادآوری‌ها',
+            label: 'یادآوری‌های روزانه',
           ),
         ],
       ),
