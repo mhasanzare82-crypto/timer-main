@@ -379,7 +379,7 @@ class _RunningActivity {
 
 class _CountdownTimer {
   final int id;
-  final String title;
+  String title;
   final int totalSeconds;
   int remainingSeconds;
   DateTime? endsAt;
@@ -2304,6 +2304,44 @@ class _MainScreenState extends State<MainScreen> {
     )));
     await _persistCountdowns();
   }
+  Future<void> _renameCountdown(_CountdownTimer item) async {
+    final controller = TextEditingController(text: item.title);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تغییر نام تایمر'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 40,
+          textDirection: TextDirection.rtl,
+          decoration: const InputDecoration(
+            labelText: 'نام تایمر',
+            hintText: 'مثلاً ساعت خواب',
+          ),
+          onSubmitted: (value) {
+            if (value.trim().isNotEmpty) Navigator.of(dialogContext).pop(value.trim());
+          },
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('لغو')),
+          FilledButton(
+            onPressed: () {
+              final value = controller.text.trim();
+              if (value.isNotEmpty) Navigator.of(dialogContext).pop(value);
+            },
+            child: const Text('ذخیره'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (newName == null || newName.trim().isEmpty || !mounted) return;
+    setState(() => item.title = newName.trim());
+    await _persistCountdowns();
+    if (item.running) await _scheduleCountdownAlarm(item);
+  }
+
   Future<void> _startCountdown(_CountdownTimer item) async {
     if(item.running||item.remainingSeconds<=0)return;
     setState(() { item.running=true; item.finished=false; item.endsAt=DateTime.now().add(Duration(seconds:item.remainingSeconds)); });
@@ -2467,6 +2505,7 @@ class _MainScreenState extends State<MainScreen> {
       decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(20),border:Border.all(color:const Color(0xFFE8EAF0))),
       child:Column(children:[
         Row(children:[Expanded(child:Text(item.title,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:16))),
+          IconButton(tooltip:'تغییر نام تایمر',onPressed:()=>_renameCountdown(item),icon:const Icon(Icons.edit_outlined)),
           IconButton(tooltip:'حذف تایمر',onPressed:()async{await _notifications.cancel(item.id);if(mounted){setState(()=>_countdowns.remove(item));await _persistCountdowns();}},
             icon:const Icon(Icons.delete_outline,color:Colors.redAccent))]),
         const SizedBox(height:8),
