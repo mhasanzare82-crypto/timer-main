@@ -141,7 +141,7 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
     if(old!=null && previousChannel!=_channelId(r)) await _deleteSoundChannel(previousChannel!);
     if(old?.soundPath!=null && old!.soundPath!=soundPath) { try { await File(old.soundPath!).delete(); } catch (_) {} }
   }
-  Future<void> _toggle(_Reminder r,bool v)async{final i=_items.indexOf(r);if(i<0)return;final n=_Reminder(r.id,r.text,r.repeat,r.date,r.hour,r.minute,r.days,v);setState(()=>_items[i]=n);await _save();await _schedule(n);}
+  Future<void> _toggle(_Reminder r,bool v)async{final i=_items.indexOf(r);if(i<0)return;final n=_Reminder(r.id,r.text,r.repeat,r.date,r.hour,r.minute,r.days,v,soundPath:r.soundPath);setState(()=>_items[i]=n);await _save();await _schedule(n);}
   Future<void> _delete(_Reminder r)async{await _cancel(r);await _deleteSoundChannel(_channelId(r));if(r.soundPath!=null){try{await File(r.soundPath!).delete();}catch(_){}}setState(()=>_items.remove(r));await _save();}
   String _repeat(_Reminder r){if(r.repeat=='daily')return 'هر روز';if(r.repeat=='weekly'){const n=['','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه','یکشنبه'];return r.days.map((d)=>n[d]).join('، ');}return 'یک‌بار • ${r.date}';}
   @override Widget build(BuildContext context)=>Scaffold(
