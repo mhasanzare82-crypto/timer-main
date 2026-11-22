@@ -1559,7 +1559,7 @@ class _MainScreenState extends State<MainScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             NavigationBar(
-        selectedIndex: _selectedIndex == 2 ? -1 : (_selectedIndex == 3 ? 2 : _selectedIndex),
+        selectedIndex: _selectedIndex == 3 ? 2 : (_selectedIndex == 2 ? 1 : _selectedIndex),
         onDestinationSelected: (index) => setState(() => _selectedIndex = index == 2 ? 3 : index),
         destinations: const [
           NavigationDestination(
