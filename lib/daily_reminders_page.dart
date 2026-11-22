@@ -10,7 +10,7 @@ class _Reminder {
   final int id; final String text, repeat, date; final int hour, minute; final List<int> days; final bool enabled;
   const _Reminder({required this.id,required this.text,required this.repeat,required this.date,required this.hour,required this.minute,required this.days,required this.enabled});
   Map<String,dynamic> toJson()=>{'id':id,'text':text,'repeat':repeat,'date':date,'hour':hour,'minute':minute,'days':days,'enabled':enabled};
-  factory _Reminder.fromJson(Map<String,dynamic> j)=>_Reminder(id:(j['id'] as num?)?.toInt()??DateTime.now().millisecondsSinceEpoch%10000000,text:j['text'] as String???'',repeat:j['repeat'] as String???'once',date:j['date'] as String???'',hour:(j['hour'] as num?)?.toInt()??8,minute:(j['minute'] as num?)?.toInt()??0,days:(j['days'] as List???[]).whereType<num>().map((e)=>e.toInt()).toList(),enabled:j['enabled'] as bool???true);
+  factory _Reminder.fromJson(Map<String,dynamic> j)=>_Reminder(id:(j['id'] as num?)?.toInt()??DateTime.now().millisecondsSinceEpoch%10000000,text:j['text'] as String? ?? '',repeat:j['repeat'] as String? ?? 'once',date:j['date'] as String? ?? '',hour:(j['hour'] as num?)?.toInt()??8,minute:(j['minute'] as num?)?.toInt()??0,days:(j['days'] as List? ?? []).whereType<num>().map((e)=>e.toInt()).toList(),enabled:j['enabled'] as bool? ?? true);
 }
 class _ReminderDraft {
   final String text, repeat, date; final int hour, minute; final List<int> days;
@@ -27,7 +27,7 @@ class _ReminderEditorState extends State<_ReminderEditor> {
   static const _dayNames=['دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه','یکشنبه'];
   @override void initState(){super.initState();final r=widget.original;_text=TextEditingController(text:r?.text??'');_date=TextEditingController(text:r?.date??widget.initialDate);_repeat=r?.repeat??'once';_hour=r?.hour??TimeOfDay.now().hour;_minute=r?.minute??TimeOfDay.now().minute;_days={...?r?.days};}
   @override void dispose(){_text.dispose();_date.dispose();super.dispose();}
-  Future<void> _pickTime()async{final t=await showTimePicker(context:context,initialTime:TimeOfDay(hour:_hour,minute:_minute));if(!mounted||t==null)return;setState(()=>_hour=t.hour,_minute=t.minute);}
+  Future<void> _pickTime()async{final t=await showTimePicker(context:context,initialTime:TimeOfDay(hour:_hour,minute:_minute));if(!mounted||t==null)return;setState((){_hour=t.hour;_minute=t.minute;});}
   @override Widget build(BuildContext context)=>AlertDialog(
     title:Text(widget.original==null?'یادآوری جدید':'ویرایش یادآوری'),
     content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.stretch,children:[
