@@ -626,6 +626,65 @@ class _AlarmCountdownPanelState extends State<_AlarmCountdownPanel>{
    ])),
  );
 }
+class _RenameCountdownDialog extends StatefulWidget {
+  final String initialName;
+
+  const _RenameCountdownDialog({required this.initialName});
+
+  @override
+  State<_RenameCountdownDialog> createState() => _RenameCountdownDialogState();
+}
+
+class _RenameCountdownDialogState extends State<_RenameCountdownDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialName);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final value = _controller.text.trim();
+    if (value.isNotEmpty) Navigator.of(context).pop(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('تغییر نام تایمر'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLength: 40,
+        textDirection: TextDirection.rtl,
+        textInputAction: TextInputAction.done,
+        decoration: const InputDecoration(
+          labelText: 'نام تایمر',
+          hintText: 'مثلاً ساعت خواب',
+        ),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('لغو'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('ذخیره'),
+        ),
+      ],
+    );
+  }
+}
+
 class MainScreen extends StatefulWidget {
   final bool biometricLockEnabled;
   final Future<void> Function(bool) onToggleBiometricLock;
@@ -2340,37 +2399,10 @@ class _MainScreenState extends State<MainScreen> {
     await _persistCountdowns();
   }
   Future<void> _renameCountdown(_CountdownTimer item) async {
-    final controller = TextEditingController(text: item.title);
     final newName = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('تغییر نام تایمر'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: 40,
-          textDirection: TextDirection.rtl,
-          decoration: const InputDecoration(
-            labelText: 'نام تایمر',
-            hintText: 'مثلاً ساعت خواب',
-          ),
-          onSubmitted: (value) {
-            if (value.trim().isNotEmpty) Navigator.of(dialogContext).pop(value.trim());
-          },
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('لغو')),
-          FilledButton(
-            onPressed: () {
-              final value = controller.text.trim();
-              if (value.isNotEmpty) Navigator.of(dialogContext).pop(value);
-            },
-            child: const Text('ذخیره'),
-          ),
-        ],
-      ),
+      builder: (_) => _RenameCountdownDialog(initialName: item.title),
     );
-    controller.dispose();
     if (newName == null || newName.trim().isEmpty || !mounted) return;
     setState(() => item.title = newName.trim());
     await _persistCountdowns();
