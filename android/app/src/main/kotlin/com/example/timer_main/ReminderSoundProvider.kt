@@ -14,12 +14,12 @@ class ReminderSoundProvider : ContentProvider() {
     override fun getType(uri: Uri): String {
         val name = uri.lastPathSegment.orEmpty().lowercase()
         return when {
-            name.endsWith(".mp3") => "audio/mpeg"
-            name.endsWith(".m4a") || name.endsWith(".mp4") => "audio/mp4"
-            name.endsWith(".wav") => "audio/wav"
-            name.endsWith(".ogg") || name.endsWith(".oga") => "audio/ogg"
-            name.endsWith(".aac") => "audio/aac"
-            name.endsWith(".flac") => "audio/flac"
+            name.endsWith(".mp3") -> "audio/mpeg"
+            name.endsWith(".m4a") || name.endsWith(".mp4") -> "audio/mp4"
+            name.endsWith(".wav") -> "audio/wav"
+            name.endsWith(".ogg") || name.endsWith(".oga") -> "audio/ogg"
+            name.endsWith(".aac") -> "audio/aac"
+            name.endsWith(".flac") -> "audio/flac"
             else -> "application/octet-stream"
         }
     }
