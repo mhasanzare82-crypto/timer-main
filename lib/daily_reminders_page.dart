@@ -1,0 +1,99 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shamsi_date/shamsi_date.dart';
+import 'package:timezone/timezone.dart' as tz;
+
+class _Reminder {
+  int id; String text, repeat, date; int hour, minute; List<int> days; bool enabled;
+  _Reminder(this.id,this.text,this.repeat,this.date,this.hour,this.minute,this.days,this.enabled);
+  Map<String,dynamic> toJson()=>{'id':id,'text':text,'repeat':repeat,'date':date,'hour':hour,'minute':minute,'days':days,'enabled':enabled};
+  factory _Reminder.fromJson(Map<String,dynamic> j)=>_Reminder(j['id'] as int,j['text'] as String? ?? '',j['repeat'] as String? ?? 'once',j['date'] as String? ?? '',j['hour'] as int? ?? 8,j['minute'] as int? ?? 0,(j['days'] as List? ?? []).whereType<num>().map((e)=>e.toInt()).toList(),j['enabled'] as bool? ?? true);
+}
+
+class DailyRemindersPage extends StatefulWidget {
+  const DailyRemindersPage({super.key});
+  @override State<DailyRemindersPage> createState()=>_DailyRemindersPageState();
+}
+
+class _DailyRemindersPageState extends State<DailyRemindersPage> {
+  static const _key='daily_reminders_v1';
+  static const _zone=MethodChannel('timer_main/device_timezone');
+  final _plugin=FlutterLocalNotificationsPlugin();
+  final List<_Reminder> _items=[];
+  bool _loading=true, _ready=false;
+
+  @override void initState(){super.initState();_init();}
+  Future<void> _init() async {
+    try {
+      await _plugin.initialize(const InitializationSettings(android:AndroidInitializationSettings('@mipmap/ic_launcher')));
+      final zone=await _zone.invokeMethod<String>('getLocalTimezone');
+      if(zone!=null && zone.isNotEmpty) tz.setLocalLocation(tz.getLocation(zone));
+      final android=_plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      await android?.requestNotificationsPermission();
+      await android?.requestExactAlarmsPermission();
+      await android?.createNotificationChannel(const AndroidNotificationChannel('daily_reminders_channel','یادآوری‌های روزانه',description:'اعلان متن یادآوری‌ها',importance:Importance.max));
+      _ready=true;
+    } catch(e){debugPrint('Reminder notification setup: $e');}
+    final prefs=await SharedPreferences.getInstance();
+    try { final raw=prefs.getString(_key); if(raw!=null) _items.addAll((jsonDecode(raw) as List).map((e)=>_Reminder.fromJson(Map<String,dynamic>.from(e)))); } catch(e){debugPrint('Reminder storage: $e');}
+    if(mounted)setState(()=>_loading=false);
+    if(_ready) for(final item in _items.where((e)=>e.enabled)) { await _schedule(item); }
+  }
+  Future<void> _save() async {final p=await SharedPreferences.getInstance();await p.setString(_key,jsonEncode(_items.map((e)=>e.toJson()).toList()));}
+  int _nid(_Reminder r,int suffix)=>850000+r.id*10+suffix;
+  Future<void> _cancel(_Reminder r) async {for(var i=0;i<=7;i++){await _plugin.cancel(_nid(r,i));}}
+  NotificationDetails get _details=>const NotificationDetails(android:AndroidNotificationDetails('daily_reminders_channel','یادآوری‌های روزانه',importance:Importance.max,priority:Priority.max,category:AndroidNotificationCategory.reminder));
+  DateTime? _date(_Reminder r){
+    final p=r.date.split('/'); if(p.length!=3)return null;
+    try{return Jalali(int.parse(p[0]),int.parse(p[1]),int.parse(p[2])).toDateTime();}catch(_){return null;}
+  }
+  DateTime _next(int h,int m,[int? weekday]){
+    final now=DateTime.now();var d=DateTime(now.year,now.month,now.day,h,m);
+    while(!d.isAfter(now)||(weekday!=null&&d.weekday!=weekday)){d=d.add(const Duration(days:1));d=DateTime(d.year,d.month,d.day,h,m);}return d;
+  }
+  Future<void> _schedule(_Reminder r) async {
+    await _cancel(r);if(!_ready||!r.enabled)return;
+    Future<void> add(int suffix,DateTime date,DateTimeComponents? match) async {
+      await _plugin.zonedSchedule(_nid(r,suffix),'یادآوری روزانه',r.text,tz.TZDateTime.from(date,tz.local),_details,androidScheduleMode:AndroidScheduleMode.exactAllowWhileIdle,matchDateTimeComponents:match,payload:'daily-reminder:${r.id}');
+    }
+    if(r.repeat=='once'){final d=_date(r);if(d==null)return;final at=DateTime(d.year,d.month,d.day,r.hour,r.minute);if(at.isAfter(DateTime.now()))await add(0,at,null);}
+    else if(r.repeat=='daily'){await add(0,_next(r.hour,r.minute),DateTimeComponents.time);}
+    else {for(final day in r.days){await add(day,_next(r.hour,r.minute,day),DateTimeComponents.dayOfWeekAndTime);}}
+  }
+  Future<void> _edit([_Reminder? old]) async {
+    final text=TextEditingController(text:old?.text??'');
+    final today=Jalali.fromDateTime(DateTime.now());var date=old?.date??'${today.year}/${today.month.toString().padLeft(2,'0')}/${today.day.toString().padLeft(2,'0')}';
+    var repeat=old?.repeat??'once',hour=old?.hour??TimeOfDay.now().hour,minute=old?.minute??TimeOfDay.now().minute;
+    final days=<int>{...(old?.days??[])};
+    final result=await showDialog<bool>(context:context,builder:(ctx)=>StatefulBuilder(builder:(ctx,refresh)=>AlertDialog(
+      title:Text(old==null?'یادآوری جدید':'ویرایش یادآوری'),
+      content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+        TextField(controller:text,minLines:3,maxLines:5,decoration:const InputDecoration(labelText:'متن یادآوری',border:OutlineInputBorder())),
+        const SizedBox(height:12),
+        DropdownButtonFormField<String>(value:repeat,decoration:const InputDecoration(labelText:'تکرار'),items:const [DropdownMenuItem(value:'once',child:Text('یک‌بار')),DropdownMenuItem(value:'daily',child:Text('هر روز')),DropdownMenuItem(value:'weekly',child:Text('روزهای هفته'))],onChanged:(v)=>refresh(()=>repeat=v??repeat)),
+        if(repeat=='once') TextFormField(initialValue:date,decoration:const InputDecoration(labelText:'تاریخ شمسی (سال/ماه/روز)'),onChanged:(v)=>date=v),
+        if(repeat=='weekly') Wrap(spacing:4,children:List.generate(7,(i)=>FilterChip(label:Text(['دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه','یکشنبه'][i]),selected:days.contains(i+1),onSelected:(v)=>refresh(()=>v?days.add(i+1):days.remove(i+1))))),
+        ListTile(contentPadding:EdgeInsets.zero,title:Text('ساعت ${hour.toString().padLeft(2,'0')}:${minute.toString().padLeft(2,'0')}'),leading:const Icon(Icons.access_time),onTap:()async{final t=await showTimePicker(context:ctx,initialTime:TimeOfDay(hour:hour,minute:minute));if(t!=null)refresh(()=>{hour=t.hour,minute=t.minute});}),
+      ])),
+      actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('لغو')),FilledButton(onPressed:()=>Navigator.pop(ctx,text.text.trim().isNotEmpty&&(repeat!='weekly'||days.isNotEmpty)),child:const Text('ذخیره'))],
+    )));
+    final value=text.text.trim();text.dispose();if(result!=true||!mounted)return;
+    if(repeat=='once'){final d=_date(_Reminder(0,'','once',date,0,0,[],true));if(d==null)return;}
+    final id=old?.id??(DateTime.now().microsecondsSinceEpoch%10000000);
+    final r=_Reminder(id,value,repeat,date,hour,minute,days.toList()..sort(),old?.enabled??true);
+    final i=_items.indexWhere((e)=>e.id==id);setState(()=>i<0?_items.add(r):_items[i]=r);await _save();await _schedule(r);
+  }
+  Future<void> _toggle(_Reminder r,bool v)async{final i=_items.indexOf(r);if(i<0)return;final n=_Reminder(r.id,r.text,r.repeat,r.date,r.hour,r.minute,r.days,v);setState(()=>_items[i]=n);await _save();await _schedule(n);}
+  Future<void> _delete(_Reminder r)async{await _cancel(r);setState(()=>_items.remove(r));await _save();}
+  String _repeat(_Reminder r){if(r.repeat=='daily')return 'هر روز';if(r.repeat=='weekly'){const n=['','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه','یکشنبه'];return r.days.map((d)=>n[d]).join('، ');}return 'یک‌بار • ${r.date}';}
+  @override Widget build(BuildContext context)=>Scaffold(
+    floatingActionButton:FloatingActionButton.extended(onPressed:()=>_edit(),icon:const Icon(Icons.add_alert),label:const Text('یادآوری جدید')),
+    body:_loading?const Center(child:CircularProgressIndicator()):_items.isEmpty?const Center(child:Text('هنوز یادآوری‌ای ثبت نکرده‌ای.')):ListView(padding:const EdgeInsets.fromLTRB(12,12,12,90),children:[
+      if(!_ready)const Text('مجوز اعلان و زمان‌بندی دقیق را در تنظیمات گوشی بررسی کن.',style:TextStyle(color:Colors.red)),
+      ..._items.map((r)=>Card(child:ListTile(isThreeLine:true,title:Text(r.text,maxLines:4,overflow:TextOverflow.ellipsis),subtitle:Text('${r.hour.toString().padLeft(2,'0')}:${r.minute.toString().padLeft(2,'0')} • ${_repeat(r)}'),leading:Switch(value:r.enabled,onChanged:(v)=>_toggle(r,v)),trailing:PopupMenuButton<String>(onSelected:(v)=>v=='edit'?_edit(r):_delete(r),itemBuilder:(_)=>const [PopupMenuItem(value:'edit',child:Text('ویرایش')),PopupMenuItem(value:'delete',child:Text('حذف'))])))),
+    ]),
+  );
+}
