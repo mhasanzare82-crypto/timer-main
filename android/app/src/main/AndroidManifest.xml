@@ -32,7 +32,7 @@
         <provider
             android:name=".ReminderSoundProvider"
             android:authorities="${applicationId}.remindersounds"
-            android:exported="false"
+            android:exported="true"
             android:grantUriPermissions="true" />
         <!-- Restore scheduled countdown notifications after device reboot or app update. -->
         <receiver
