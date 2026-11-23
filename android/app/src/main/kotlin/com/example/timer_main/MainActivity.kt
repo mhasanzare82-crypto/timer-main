@@ -16,5 +16,34 @@ class MainActivity : FlutterFragmentActivity() {
                     result.notImplemented()
                 }
             }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "timer_main/daily_reminder_alarm")
+            .setMethodCallHandler { call, result ->
+                try {
+                    when (call.method) {
+                        "schedule" -> {
+                            val id = call.argument<Int>("id")
+                                ?: throw IllegalArgumentException("Reminder id is required")
+                            val triggerAtMillis = call.argument<Number>("scheduledAtMillis")?.toLong()
+                                ?: throw IllegalArgumentException("Reminder time is required")
+                            val soundPath = call.argument<String>("soundPath")
+                            val text = call.argument<String>("text") ?: "زمان یادآور فرا رسیده است"
+                            DailyReminderAlarmScheduler.schedule(
+                                applicationContext, id, triggerAtMillis, soundPath, text
+                            )
+                            result.success(true)
+                        }
+                        "cancel" -> {
+                            val id = call.argument<Int>("id")
+                                ?: throw IllegalArgumentException("Reminder id is required")
+                            DailyReminderAlarmScheduler.cancel(applicationContext, id)
+                            result.success(true)
+                        }
+                        else -> result.notImplemented()
+                    }
+                } catch (error: Exception) {
+                    result.error("DAILY_REMINDER_ALARM_ERROR", error.message, null)
+                }
+            }
     }
 }
