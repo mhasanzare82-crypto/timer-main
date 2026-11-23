@@ -28,8 +28,9 @@ class MainActivity : FlutterFragmentActivity() {
                                 ?: throw IllegalArgumentException("Reminder time is required")
                             val soundPath = call.argument<String>("soundPath")
                             val text = call.argument<String>("text") ?: "زمان یادآور فرا رسیده است"
+                            val repeatDaily = call.argument<Boolean>("repeatDaily") ?: false
                             DailyReminderAlarmScheduler.schedule(
-                                applicationContext, id, triggerAtMillis, soundPath, text
+                                applicationContext, id, triggerAtMillis, soundPath, text, repeatDaily
                             )
                             result.success(true)
                         }
