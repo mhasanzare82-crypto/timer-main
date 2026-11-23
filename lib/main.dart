@@ -2443,7 +2443,7 @@ class _MainScreenState extends State<MainScreen> {
     setState(() => _dailyReminders.add(item));
     await _saveDailyReminders();
     await _scheduleDailyReminder(item);
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('یادآور ذخیره و زمان‌بندی شد.'));
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('یادآور ذخیره و زمان‌بندی شد.')));
   }
 
   Future<void> _finishCountdown(_CountdownTimer item) async {
