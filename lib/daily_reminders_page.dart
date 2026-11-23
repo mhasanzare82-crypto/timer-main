@@ -77,7 +77,61 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
       if(!await _persist(proposed)){_snack('ذخیره ناموفق بود؛ داده قبلی حفظ شد.');return;}
       if(!mounted)return;setState(()=>_items..clear()..addAll(proposed));if(!await _schedule(saved))_snack('یادآور ذخیره شد، ولی تنظیم اعلان انجام نشد. مجوز اعلان را بررسی کن.');
     }finally{_busy=false;}}
-  Future<void> _toggle(_Reminder r,bool value)async{if(_busy)return;final i=_items.indexWhere((e)=>e.id==r.id);if(i<0)return;_busy=true;try{final changed=_copy(r,enabled:value);final proposed=List<_Reminder>.of(_items)..[i]=changed;if(!await _persist(proposed)){_snack('تغییر ذخیره نشد؛ وضعیت قبلی حفظ شد.');return;}if(!mounted)return;setState(()=>_items..clear()..addAll(proposed));if(!await _schedule(changed))_snack('تغییر ذخیره شد اما اعلان به‌روزرسانی نشد.');}finally{_busy=false;}}
+  Future<void> _toggle(_Reminder r, bool value) async {
+    if (_busy) return;
+    final index = _items.indexWhere((item) => item.id == r.id);
+    if (index < 0 || _items[index].enabled == value) return;
+
+    final previous = List<_Reminder>.of(_items);
+    final changed = _copy(_items[index], enabled: value);
+    final proposed = List<_Reminder>.of(_items)..[index] = changed;
+
+    // Update the switch immediately; persistence and notification work follow.
+    _busy = true;
+    if (mounted) {
+      setState(() {
+        _items
+          ..clear()
+          ..addAll(proposed);
+      });
+    }
+
+    try {
+      final stored = await _persist(proposed);
+      if (!stored) {
+        if (mounted) {
+          setState(() {
+            _items
+              ..clear()
+              ..addAll(previous);
+          });
+        }
+        _snack('تغییر ذخیره نشد؛ وضعیت قبلی حفظ شد.');
+        return;
+      }
+
+      final scheduled = await _schedule(changed);
+      if (!scheduled) {
+        _snack(value
+            ? 'یادآور فعال شد، اما زمان‌بندی اعلان انجام نشد. مجوز اعلان را بررسی کن.'
+            : 'یادآور غیرفعال شد، اما لغو اعلان کامل نشد.');
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Reminder toggle error id=${r.id}: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (mounted) {
+        setState(() {
+          _items
+            ..clear()
+            ..addAll(previous);
+        });
+      }
+      _snack('تغییر وضعیت یادآور انجام نشد.');
+    } finally {
+      _busy = false;
+      if (mounted) setState(() {});
+    }
+  }
   Future<void> _delete(_Reminder r)async{if(_busy)return;_busy=true;try{final proposed=List<_Reminder>.of(_items)..removeWhere((e)=>e.id==r.id);if(!await _persist(proposed)){_snack('حذف ذخیره نشد؛ یادآور حفظ شد.');return;}if(!mounted)return;setState(()=>_items..clear()..addAll(proposed));await _cancel(r);}finally{_busy=false;}}
   String _repeat(_Reminder r){if(r.repeat=='daily')return 'هر روز';if(r.repeat=='weekly'){const names=['','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه','یکشنبه'];return r.days.where((d)=>d>0&&d<8).map((d)=>names[d]).join('، ');}return 'یک‌بار • ${r.date}';}
   @override
