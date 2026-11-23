@@ -17,7 +17,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'daily_reminders_page.dart';
+// Daily reminders tab intentionally left blank.
 
 final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
 
@@ -1561,7 +1561,7 @@ class _MainScreenState extends State<MainScreen> {
           _buildActivitiesPage(),
           _buildReportsPage(),
           _buildCountdownPage(),
-          const DailyRemindersPage(),
+          const Scaffold(body: SizedBox.shrink()),
         ],
       ),
       bottomNavigationBar: SafeArea(
