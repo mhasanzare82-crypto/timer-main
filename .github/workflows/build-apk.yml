@@ -47,8 +47,15 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
-      - name: Build release APK
-        run: flutter build apk --release
+      # The user's target device is ARM64. Build only that ABI to avoid bundling
+      # native libraries for x86/x86_64/armeabi-v7a in the installable release APK.
+      - name: Build optimized ARM64 release APK
+        run: flutter build apk --release --split-per-abi --target-platform android-arm64
+
+      - name: Report APK size
+        run: |
+          ls -lh build/app/outputs/flutter-apk/
+          du -h build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 
       - name: Build debug APK
         run: flutter build apk --debug
@@ -65,6 +72,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: timer-main-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
           if-no-files-found: error
           retention-days: 14
