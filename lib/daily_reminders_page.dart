@@ -70,7 +70,7 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
   Future<void> _edit([_Reminder? old])async{if(_busy||_loading)return;final j=Jalali.fromDateTime(DateTime.now());final initial='${j.year}/${j.month.toString().padLeft(2,'0')}/${j.day.toString().padLeft(2,'0')}';final draft=await showDialog<_ReminderDraft>(context:context,barrierDismissible:false,builder:(_)=>_ReminderEditor(original:old,initialDate:initial));if(draft==null||!mounted)return;
     if(draft.repeat=='once'){final p=draft.date.split('/');DateTime? date;if(p.length==3){try{date=Jalali(int.parse(p[0]),int.parse(p[1]),int.parse(p[2])).toDateTime();}catch(_){}}if(date==null||!DateTime(date.year,date.month,date.day,draft.hour,draft.minute).isAfter(DateTime.now())){_snack('تاریخ شمسی معتبر و زمان آینده وارد کن.');return;}}
     if(draft.repeat=='weekly'&&draft.days.isEmpty){_snack('حداقل یک روز هفته انتخاب کن.');return;}
-    _busy=true;try{var id=old?.id;if(id==null){id=DateTime.now().microsecondsSinceEpoch%10000000;while(_items.any((e)=>e.id==id)){id=(id+1)%10000000;}}
+    _busy=true;try{late final int id;if(old!=null){id=old.id;}else{var candidate=DateTime.now().microsecondsSinceEpoch%10000000;while(_items.any((e)=>e.id==candidate)){candidate=(candidate+1)%10000000;}id=candidate;}
       final saved=_Reminder(id:id,text:draft.text,repeat:draft.repeat,date:draft.date,hour:draft.hour,minute:draft.minute,days:List<int>.of(draft.days),enabled:old?.enabled??true);
       final proposed=List<_Reminder>.of(_items);final idx=proposed.indexWhere((e)=>e.id==saved.id);if(idx<0){proposed.add(saved);}else{proposed[idx]=saved;}
       // Commit storage first; only update the visible state if storage succeeds.
