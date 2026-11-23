@@ -28,7 +28,7 @@ internal object DailyReminderAlarmScheduler {
             .putString(PREFIX + id, record.toString())
             .apply()
 
-        val intent = alarmIntent(context, id, triggerAtMillis, soundPath, text)
+        val intent = alarmIntent(context, id, triggerAtMillis, soundPath, text, repeatDaily)
         val pendingIntent = PendingIntent.getBroadcast(
             context, id, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -104,7 +104,8 @@ internal object DailyReminderAlarmScheduler {
         id: Int,
         triggerAtMillis: Long,
         soundPath: String?,
-        text: String
+        text: String,
+        repeatDaily: Boolean
     ) = Intent(context, DailyReminderAlarmReceiver::class.java).apply {
         putExtra(DailyReminderAlarmReceiver.EXTRA_ID, id)
         putExtra(DailyReminderAlarmReceiver.EXTRA_TRIGGER_AT, triggerAtMillis)
