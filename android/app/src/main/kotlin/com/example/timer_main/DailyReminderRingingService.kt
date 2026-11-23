@@ -13,7 +13,7 @@ import android.media.RingtoneManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
-import android.app.ServiceInfo
+import android.content.pm.ServiceInfo
 
 class DailyReminderRingingService : Service() {
     companion object {
