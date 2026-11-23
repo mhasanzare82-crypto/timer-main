@@ -2513,7 +2513,7 @@ class _MainScreenState extends State<MainScreen> {
       SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _openNewDailyReminder, icon: const Icon(Icons.add_alert), label: const Text('یادآور جدید'), style: FilledButton.styleFrom(backgroundColor: _accentColor, padding: const EdgeInsets.symmetric(vertical: 14)))),
       const SizedBox(height: 14),
       if (_dailyReminders.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: 36), child: Center(child: Text('هنوز یادآوری‌ای ثبت نشده است.')))
-      else ..._dailyReminders.map((item) => Card(color: Colors.white, elevation: 0, margin: const EdgeInsets.only(bottom: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE8EAF0))), child: ListTile(leading: Icon(Icons.notifications_active_outlined, color: _accentColor), title: Text(item.text, maxLines: 2, overflow: TextOverflow.ellipsis), subtitle: Text(_jalaliDate(item.scheduledAt) + ' • ' + _clockTime(item.scheduledAt, withSeconds: false) + (item.repeatDaily ? ' • تکرار روزانه' : ' • یک‌بار')), trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+      else ..._dailyReminders.map((item) => Card(color: Colors.white, elevation: 0, margin: const EdgeInsets.only(bottom: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE8EAF0))), child: ListTile(leading: Icon(Icons.notifications_active_outlined, color: _accentColor), title: Text(item.text, maxLines: 2, overflow: TextOverflow.ellipsis), subtitle: Text(item.repeatDaily ? 'هر روز • ' + _clockTime(item.scheduledAt, withSeconds: false) : _jalaliDate(item.scheduledAt) + ' • ' + _clockTime(item.scheduledAt, withSeconds: false) + ' • یک‌بار'), trailing: Row(mainAxisSize: MainAxisSize.min, children: [
           IconButton(tooltip: 'ویرایش یادآور', icon: Icon(Icons.edit_outlined, color: _accentColor), onPressed: () => _editDailyReminder(item)),
           IconButton(tooltip: _playingDailyReminderId == item.id ? 'توقف پخش' : 'پخش آزمایشی صدا', icon: Icon(_playingDailyReminderId == item.id ? Icons.stop_circle_outlined : Icons.play_circle_outline, color: _accentColor), onPressed: () => _playDailyReminderTest(item)),
           IconButton(tooltip: 'حذف یادآور', icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () async { if (_playingDailyReminderId == item.id) { await _dailyReminderPreviewPlayer.stop(); _playingDailyReminderId = null; } await _cancelDailyReminderAlarm(item.id); if (!mounted) return; setState(() => _dailyReminders.remove(item)); await _saveDailyReminders(); })
@@ -2890,8 +2890,16 @@ class _DailyReminderFormPageState extends State<_DailyReminderFormPage> {
   void initState() {
     super.initState();
     final existing = widget.initialReminder;
-    _date = existing?.scheduledAt ?? DateTime.now();
-    _time = TimeOfDay.fromDateTime(existing?.scheduledAt ?? DateTime.now().add(const Duration(minutes: 5)));
+    final now = DateTime.now();
+    var initialDateTime = existing?.scheduledAt ?? now.add(const Duration(minutes: 5));
+    if (existing?.repeatDaily == true && !initialDateTime.isAfter(now)) {
+      initialDateTime = DateTime(now.year, now.month, now.day, initialDateTime.hour, initialDateTime.minute);
+      while (!initialDateTime.isAfter(now)) {
+        initialDateTime = initialDateTime.add(const Duration(days: 1));
+      }
+    }
+    _date = DateTime(initialDateTime.year, initialDateTime.month, initialDateTime.day);
+    _time = TimeOfDay.fromDateTime(initialDateTime);
     _text.text = existing?.text ?? '';
     _soundPath = existing?.soundPath;
     _repeatDaily = existing?.repeatDaily ?? false;
