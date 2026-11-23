@@ -63,7 +63,7 @@ internal object DailyReminderAlarmScheduler {
         try {
             alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pending)
         } catch (_: SecurityException) {
-            runCatching { alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pending) }
+            alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pending)
         }
     }
 
