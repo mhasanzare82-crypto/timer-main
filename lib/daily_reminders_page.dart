@@ -72,9 +72,8 @@ class _ReminderEditorState extends State<_ReminderEditor> {
   Future<void> _pickTime()async{final t=await showTimePicker(context:context,initialTime:TimeOfDay(hour:_hour,minute:_minute));if(!mounted||t==null)return;setState((){_hour=t.hour;_minute=t.minute;});}
   Future<void> _pickSound() async {
     try {
-      final result = await FilePicker.platform.pickFiles(type: FileType.audio, allowMultiple: false);
-      if (!mounted || result == null || result.files.isEmpty) return;
-      final file = result.files.single;
+      final file = await FilePicker.pickFile(type: FileType.audio);
+      if (!mounted || file == null) return;
       if (file.path == null) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('دسترسی به فایل صوتی انتخاب‌شده ممکن نیست.')));
         return;
