@@ -768,7 +768,6 @@ class _MainScreenState extends State<MainScreen> {
     _initializeData();
     _clearRemovedChecklistData();
     _initializeAlarmNotifications();
-    _loadDailyReminders();
     _countdownTicker=Timer.periodic(const Duration(seconds:1), (_) => _tickCountdowns());
   }
 
@@ -2244,6 +2243,7 @@ class _MainScreenState extends State<MainScreen> {
     );
     await android?.createNotificationChannel(channel);
     await _restoreCountdowns();
+    await _loadDailyReminders();
   }
 
   Future<void> _persistCountdowns() async {
@@ -2786,6 +2786,7 @@ class _DailyReminderFormPageState extends State<_DailyReminderFormPage> {
   }
   Future<void> _preview() async { final p = _soundPath; if (p == null || !File(p).existsSync()) return; try { await _player.stop(); await _player.play(DeviceFileSource(p)); } catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('پخش زنگ ممکن نشد.'))); } }
   void _save() { final text = _text.text.trim(); if (text.isEmpty) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('متن یادآور را وارد کن.'))); return; } if (!_when.isAfter(DateTime.now())) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تاریخ و ساعت باید در آینده باشد.'))); return; } Navigator.of(context).pop(_DailyReminder(id: 0, text: text, scheduledAt: _when, soundPath: _soundPath)); }
+  }
   @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('یادآور جدید')), body: ListView(padding: const EdgeInsets.all(16), children: [
     TextField(controller: _text, minLines: 3, maxLines: 6, maxLength: 300, decoration: const InputDecoration(labelText: 'متن یادآور', hintText: 'چه چیزی را می‌خواهی به خاطر بسپاری؟', border: OutlineInputBorder())),
     const SizedBox(height: 8), Card(color: Colors.white, elevation: 0, child: ListTile(leading: const Icon(Icons.calendar_month_outlined), title: const Text('تاریخ'), subtitle: Text(_dateText(_date)), trailing: const Icon(Icons.chevron_left), onTap: _pickDate)),
