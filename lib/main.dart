@@ -23,12 +23,8 @@ final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotifications
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Launch the UI first so plugin initialization cannot leave a blank screen.
   tzdata.initializeTimeZones();
-  runApp(const TimerApp());
-
-  // Notification setup is non-critical for displaying the app. Run it after
-  // startup and catch plugin/platform errors instead of blocking the first frame.
+  // Initialize notifications before the UI schedules any reminder alarms.
   try {
     const initSettings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
@@ -38,6 +34,7 @@ Future<void> main() async {
     debugPrint('Notification initialization failed: $error');
     debugPrintStack(stackTrace: stackTrace);
   }
+  runApp(const TimerApp());
 }
 
 class TimerApp extends StatelessWidget {
@@ -2418,8 +2415,11 @@ class _MainScreenState extends State<MainScreen> {
       final decoded = (jsonDecode(raw) as List<dynamic>).map((item) => _DailyReminder.fromJson(Map<String, dynamic>.from(item as Map))).toList();
       if (!mounted) return;
       setState(() { _dailyReminders..clear()..addAll(decoded); _nextDailyReminderId = _dailyReminders.isEmpty ? 850000 : _dailyReminders.map((item) => item.id).reduce((a, b) => a > b ? a : b) + 1; });
-      for (final item in decoded) { await _scheduleDailyReminder(item); }
-    } catch (_) { }
+      for (final item in decoded) {
+        try { await _scheduleDailyReminder(item); }
+        catch (error) { debugPrint('Failed to restore daily reminder ${item.id}: $error'); }
+      }
+    } catch (error) { debugPrint('Failed to load daily reminders: $error'); }
   }
   Future<void> _saveDailyReminders() async {
     final prefs = await SharedPreferences.getInstance();
@@ -2454,6 +2454,15 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _scheduleDailyReminder(_DailyReminder item) async {
     await _notifications.cancel(item.id);
     if (!item.scheduledAt.isAfter(DateTime.now())) return;
+    final android = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final notificationsAllowed = await android?.areNotificationsEnabled() ?? true;
+    if (!notificationsAllowed) {
+      throw StateError('اجازه اعلان برای برنامه فعال نیست.');
+    }
+    final exactAllowed = await android?.canScheduleExactNotifications() ?? true;
+    if (!exactAllowed) {
+      throw StateError('اجازه زمان‌بندی دقیق فعال نیست. از تنظیمات اندروید، دسترسی زنگ و یادآور را فعال کن.');
+    }
     final soundPath = item.soundPath;
     final channel = soundPath == null ? 'daily_reminder_default' : 'daily_reminder_' + item.id.toString();
     final sound = soundPath != null && File(soundPath).existsSync() ? UriAndroidNotificationSound(Uri.file(soundPath).toString()) : null;
@@ -2477,8 +2486,13 @@ class _MainScreenState extends State<MainScreen> {
     item.id = _nextDailyReminderId++;
     setState(() => _dailyReminders.add(item));
     await _saveDailyReminders();
-    await _scheduleDailyReminder(item);
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('یادآور ذخیره و زمان‌بندی شد.')));
+    try {
+      await _scheduleDailyReminder(item);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('یادآور با موفقیت زمان‌بندی شد.')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('یادآور ذخیره شد اما زمان‌بندی نشد: $error')));
+      debugPrint('Daily reminder scheduling failed: $error');
+    }
   }
 
   Future<void> _finishCountdown(_CountdownTimer item) async {
