@@ -2765,33 +2765,179 @@ class _MainScreenState extends State<MainScreen> {
   }
 }class _DailyReminderFormPage extends StatefulWidget {
   const _DailyReminderFormPage();
-  @override State<_DailyReminderFormPage> createState() => _DailyReminderFormPageState();
+
+  @override
+  State<_DailyReminderFormPage> createState() => _DailyReminderFormPageState();
 }
+
 class _DailyReminderFormPageState extends State<_DailyReminderFormPage> {
   final _text = TextEditingController();
   final _player = AudioPlayer();
   DateTime _date = DateTime.now();
   TimeOfDay _time = TimeOfDay.fromDateTime(DateTime.now().add(const Duration(minutes: 5)));
   String? _soundPath;
-  @override void dispose() { _text.dispose(); _player.dispose(); super.dispose(); }
+
+  @override
+  void dispose() {
+    _text.dispose();
+    _player.dispose();
+    super.dispose();
+  }
+
   DateTime get _when => DateTime(_date.year, _date.month, _date.day, _time.hour, _time.minute);
-  String _dateText(DateTime date) { final j = Jalali.fromDateTime(date); return j.year.toString() + '/' + j.month.toString().padLeft(2, '0') + '/' + j.day.toString().padLeft(2, '0'); }
-  Future<void> _pickDate() async { final d = await showDatePicker(context: context, initialDate: _date.isBefore(DateTime.now()) ? DateTime.now() : _date, firstDate: DateTime.now(), lastDate: DateTime(2100)); if (d != null && mounted) setState(() => _date = d); }
-  Future<void> _pickTime() async { final t = await showTimePicker(context: context, initialTime: _time); if (t != null && mounted) setState(() => _time = t); }
+
+  String _dateText(DateTime date) {
+    final j = Jalali.fromDateTime(date);
+    return j.year.toString() + '/' + j.month.toString().padLeft(2, '0') + '/' + j.day.toString().padLeft(2, '0');
+  }
+
+  Future<void> _pickDate() async {
+    final d = await showDatePicker(
+      context: context,
+      initialDate: _date.isBefore(DateTime.now()) ? DateTime.now() : _date,
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+    );
+    if (d != null && mounted) setState(() => _date = d);
+  }
+
+  Future<void> _pickTime() async {
+    final t = await showTimePicker(context: context, initialTime: _time);
+    if (t != null && mounted) setState(() => _time = t);
+  }
+
   Future<void> _pickSound() async {
     final file = await FilePicker.pickFile(type: FileType.audio);
     if (file == null || file.path == null) return;
-    try { final dir = await getApplicationSupportDirectory(); final name = file.path!.split('/').last; final copied = await File(file.path!).copy(dir.path + '/reminder_sound_' + DateTime.now().millisecondsSinceEpoch.toString() + '_' + name); if (mounted) setState(() => _soundPath = copied.path); }
-    catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ذخیره فایل زنگ انجام نشد.'))); }
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final name = file.path!.split('/').last;
+      final copied = await File(file.path!).copy(
+        dir.path + '/reminder_sound_' + DateTime.now().millisecondsSinceEpoch.toString() + '_' + name,
+      );
+      if (mounted) setState(() => _soundPath = copied.path);
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ذخیره فایل زنگ انجام نشد.')));
+    }
   }
-  Future<void> _preview() async { final p = _soundPath; if (p == null || !File(p).existsSync()) return; try { await _player.stop(); await _player.play(DeviceFileSource(p)); } catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('پخش زنگ ممکن نشد.'))); } }
-  void _save() { final text = _text.text.trim(); if (text.isEmpty) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('متن یادآور را وارد کن.'))); return; } if (!_when.isAfter(DateTime.now())) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تاریخ و ساعت باید در آینده باشد.'))); return; } Navigator.of(context).pop(_DailyReminder(id: 0, text: text, scheduledAt: _when, soundPath: _soundPath)); }
+
+  Future<void> _preview() async {
+    final path = _soundPath;
+    if (path == null || !File(path).existsSync()) return;
+    try {
+      await _player.stop();
+      await _player.play(DeviceFileSource(path));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('پخش زنگ ممکن نشد.')));
+    }
   }
-  @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('یادآور جدید')), body: ListView(padding: const EdgeInsets.all(16), children: [
-    TextField(controller: _text, minLines: 3, maxLines: 6, maxLength: 300, decoration: const InputDecoration(labelText: 'متن یادآور', hintText: 'چه چیزی را می‌خواهی به خاطر بسپاری؟', border: OutlineInputBorder())),
-    const SizedBox(height: 8), Card(color: Colors.white, elevation: 0, child: ListTile(leading: const Icon(Icons.calendar_month_outlined), title: const Text('تاریخ'), subtitle: Text(_dateText(_date)), trailing: const Icon(Icons.chevron_left), onTap: _pickDate)),
-    Card(color: Colors.white, elevation: 0, child: ListTile(leading: const Icon(Icons.access_time), title: const Text('ساعت'), subtitle: Text(_time.format(context)), trailing: const Icon(Icons.chevron_left), onTap: _pickTime)),
-    Card(color: Colors.white, elevation: 0, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [const Text('زنگ هشدار', style: TextStyle(fontWeight: FontWeight.w600)), const SizedBox(height: 4), Text(_soundPath == null ? 'زنگ پیش‌فرض' : _soundPath!.split('/').last, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black54)), Row(children: [Expanded(child: OutlinedButton.icon(onPressed: _pickSound, icon: const Icon(Icons.folder_open), label: const Text('انتخاب زنگ از حافظه گوشی'))), if (_soundPath != null) IconButton(tooltip: 'پخش آزمایشی زنگ', onPressed: _preview, icon: const Icon(Icons.play_circle_outline))]), if (_soundPath != null) TextButton.icon(onPressed: () => setState(() => _soundPath = null), icon: const Icon(Icons.delete_outline), label: const Text('بازگشت به زنگ پیش‌فرض'))]))),
-    const SizedBox(height: 18), FilledButton.icon(onPressed: _save, icon: const Icon(Icons.save_outlined), label: const Text('ذخیره یادآور'), style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)))
-  ]));
+
+  void _save() {
+    final text = _text.text.trim();
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('متن یادآور را وارد کن.')));
+      return;
+    }
+    if (!_when.isAfter(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تاریخ و ساعت باید در آینده باشد.')));
+      return;
+    }
+    Navigator.of(context).pop(_DailyReminder(id: 0, text: text, scheduledAt: _when, soundPath: _soundPath));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('یادآور جدید')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          TextField(
+            controller: _text,
+            minLines: 3,
+            maxLines: 6,
+            maxLength: 300,
+            decoration: const InputDecoration(
+              labelText: 'متن یادآور',
+              hintText: 'چه چیزی را می‌خواهی به خاطر بسپاری؟',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            color: Colors.white,
+            elevation: 0,
+            child: ListTile(
+              leading: const Icon(Icons.calendar_month_outlined),
+              title: const Text('تاریخ'),
+              subtitle: Text(_dateText(_date)),
+              trailing: const Icon(Icons.chevron_left),
+              onTap: _pickDate,
+            ),
+          ),
+          Card(
+            color: Colors.white,
+            elevation: 0,
+            child: ListTile(
+              leading: const Icon(Icons.access_time),
+              title: const Text('ساعت'),
+              subtitle: Text(_time.format(context)),
+              trailing: const Icon(Icons.chevron_left),
+              onTap: _pickTime,
+            ),
+          ),
+          Card(
+            color: Colors.white,
+            elevation: 0,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text('زنگ هشدار', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Text(
+                    _soundPath == null ? 'زنگ پیش‌فرض' : _soundPath!.split('/').last,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.black54),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _pickSound,
+                          icon: const Icon(Icons.folder_open),
+                          label: const Text('انتخاب زنگ از حافظه گوشی'),
+                        ),
+                      ),
+                      if (_soundPath != null)
+                        IconButton(
+                          tooltip: 'پخش آزمایشی زنگ',
+                          onPressed: _preview,
+                          icon: const Icon(Icons.play_circle_outline),
+                        ),
+                    ],
+                  ),
+                  if (_soundPath != null)
+                    TextButton.icon(
+                      onPressed: () => setState(() => _soundPath = null),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('بازگشت به زنگ پیش‌فرض'),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          FilledButton.icon(
+            onPressed: _save,
+            icon: const Icon(Icons.save_outlined),
+            label: const Text('ذخیره یادآور'),
+            style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+          ),
+        ],
+      ),
+    );
+  }
 }
