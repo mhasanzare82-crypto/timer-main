@@ -20,6 +20,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 // Daily reminders tab intentionally left blank.
 
 final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+const MethodChannel _dailyReminderAlarmChannel = MethodChannel('timer_main/daily_reminder_alarm');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -2451,8 +2452,13 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
+  Future<void> _cancelDailyReminderAlarm(int id) async {
+    await _dailyReminderAlarmChannel.invokeMethod<void>('cancel', {'id': id});
+    await _notifications.cancel(id);
+  }
+
   Future<void> _scheduleDailyReminder(_DailyReminder item) async {
-    await _notifications.cancel(item.id);
+    await _cancelDailyReminderAlarm(item.id);
     if (!item.scheduledAt.isAfter(DateTime.now())) return;
     final android = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     final notificationsAllowed = await android?.areNotificationsEnabled() ?? true;
@@ -2463,11 +2469,37 @@ class _MainScreenState extends State<MainScreen> {
     if (!exactAllowed) {
       throw StateError('اجازه زمان‌بندی دقیق فعال نیست. از تنظیمات اندروید، دسترسی زنگ و یادآور را فعال کن.');
     }
+
     final soundPath = item.soundPath;
-    final channel = soundPath == null ? 'daily_reminder_default' : 'daily_reminder_' + item.id.toString();
-    final sound = soundPath != null && File(soundPath).existsSync() ? UriAndroidNotificationSound(Uri.file(soundPath).toString()) : null;
-    final details = AndroidNotificationDetails(channel, 'یادآورهای شخصی', channelDescription: 'اعلان یادآورهای ثبت‌شده', importance: Importance.max, priority: Priority.max, category: AndroidNotificationCategory.alarm, playSound: true, sound: sound, audioAttributesUsage: AudioAttributesUsage.alarm);
-    await _notifications.zonedSchedule(item.id, 'یادآور', item.text, tz.TZDateTime.from(item.scheduledAt, tz.local), NotificationDetails(android: details), androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, payload: 'daily-reminder:' + item.id.toString());
+    final validSoundPath = soundPath != null && await File(soundPath).exists() ? soundPath : null;
+    await _dailyReminderAlarmChannel.invokeMethod<void>('schedule', {
+      'id': item.id,
+      'scheduledAtMillis': item.scheduledAt.millisecondsSinceEpoch,
+      'soundPath': validSoundPath,
+      'text': item.text,
+    });
+
+    // The notification is informational only. Native Android foreground playback
+    // owns the alarm audio so it can loop until the user stops it.
+    const details = AndroidNotificationDetails(
+      'daily_reminder_notice_v2',
+      'اعلان یادآورهای روزانه',
+      channelDescription: 'نمایش متن یادآورهای ثبت‌شده',
+      importance: Importance.high,
+      priority: Priority.high,
+      category: AndroidNotificationCategory.alarm,
+      playSound: false,
+      enableVibration: true,
+    );
+    await _notifications.zonedSchedule(
+      item.id,
+      'یادآور',
+      item.text,
+      tz.TZDateTime.from(item.scheduledAt, tz.local),
+      const NotificationDetails(android: details),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      payload: 'daily-reminder:' + item.id.toString(),
+    );
   }
   Widget _buildDailyRemindersPage() {
     return ListView(padding: const EdgeInsets.all(16), children: [
@@ -2476,7 +2508,7 @@ class _MainScreenState extends State<MainScreen> {
       if (_dailyReminders.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: 36), child: Center(child: Text('هنوز یادآوری‌ای ثبت نشده است.')))
       else ..._dailyReminders.map((item) => Card(color: Colors.white, elevation: 0, margin: const EdgeInsets.only(bottom: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE8EAF0))), child: ListTile(leading: Icon(Icons.notifications_active_outlined, color: _accentColor), title: Text(item.text, maxLines: 2, overflow: TextOverflow.ellipsis), subtitle: Text(_jalaliDate(item.scheduledAt) + ' • ' + _clockTime(item.scheduledAt, withSeconds: false)), trailing: Row(mainAxisSize: MainAxisSize.min, children: [
           IconButton(tooltip: _playingDailyReminderId == item.id ? 'توقف پخش' : 'پخش آزمایشی صدا', icon: Icon(_playingDailyReminderId == item.id ? Icons.stop_circle_outlined : Icons.play_circle_outline, color: _accentColor), onPressed: () => _playDailyReminderTest(item)),
-          IconButton(tooltip: 'حذف یادآور', icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () async { if (_playingDailyReminderId == item.id) { await _dailyReminderPreviewPlayer.stop(); _playingDailyReminderId = null; } await _notifications.cancel(item.id); if (!mounted) return; setState(() => _dailyReminders.remove(item)); await _saveDailyReminders(); })
+          IconButton(tooltip: 'حذف یادآور', icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () async { if (_playingDailyReminderId == item.id) { await _dailyReminderPreviewPlayer.stop(); _playingDailyReminderId = null; } await _cancelDailyReminderAlarm(item.id); if (!mounted) return; setState(() => _dailyReminders.remove(item)); await _saveDailyReminders(); })
         ]))))
     ]);
   }
