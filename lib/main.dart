@@ -738,6 +738,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<_DailyReminder> _dailyReminders = [];
   int _nextDailyReminderId = 850000;
   final AudioPlayer _dailyReminderPreviewPlayer = AudioPlayer();
+  int? _playingDailyReminderId;
   Timer? _countdownTicker;
   int _wheelHours=0, _wheelMinutes=5, _wheelSeconds=0, _nextCountdownId=1000;
   late final FixedExtentScrollController _hoursWheelController;
@@ -2419,6 +2420,37 @@ class _MainScreenState extends State<MainScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_dailyRemindersStorageKey, jsonEncode(_dailyReminders.map((item) => item.toJson()).toList()));
   }
+  Future<void> _playDailyReminderTest(_DailyReminder item) async {
+    final player = _dailyReminderPreviewPlayer;
+    if (_playingDailyReminderId == item.id) {
+      await player.stop();
+      if (mounted) setState(() => _playingDailyReminderId = null);
+      return;
+    }
+    try {
+      await player.stop();
+      final path = item.soundPath;
+      if (path != null && File(path).existsSync()) {
+        if (mounted) setState(() => _playingDailyReminderId = item.id);
+        player.onPlayerComplete.listen((_) {
+          if (mounted && _playingDailyReminderId == item.id) {
+            setState(() => _playingDailyReminderId = null);
+          }
+        });
+        await player.play(DeviceFileSource(path));
+      } else {
+        SystemSound.play(SystemSoundType.alert);
+        if (mounted) setState(() => _playingDailyReminderId = null);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('این یادآور زنگ اختصاصی ندارد؛ صدای پیش‌فرض گوشی آزمایش شد.')));
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _playingDailyReminderId = null);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('پخش صدای یادآور ناموفق بود.')));
+      }
+    }
+  }
+
   Future<void> _scheduleDailyReminder(_DailyReminder item) async {
     await _notifications.cancel(item.id);
     if (!item.scheduledAt.isAfter(DateTime.now())) return;
@@ -2433,7 +2465,10 @@ class _MainScreenState extends State<MainScreen> {
       SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _openNewDailyReminder, icon: const Icon(Icons.add_alert), label: const Text('یادآور جدید'), style: FilledButton.styleFrom(backgroundColor: _accentColor, padding: const EdgeInsets.symmetric(vertical: 14)))),
       const SizedBox(height: 14),
       if (_dailyReminders.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: 36), child: Center(child: Text('هنوز یادآوری‌ای ثبت نشده است.')))
-      else ..._dailyReminders.map((item) => Card(color: Colors.white, elevation: 0, margin: const EdgeInsets.only(bottom: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE8EAF0))), child: ListTile(leading: Icon(Icons.notifications_active_outlined, color: _accentColor), title: Text(item.text, maxLines: 2, overflow: TextOverflow.ellipsis), subtitle: Text(_jalaliDate(item.scheduledAt) + ' • ' + _clockTime(item.scheduledAt, withSeconds: false)), trailing: IconButton(tooltip: 'حذف یادآور', icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () async { await _notifications.cancel(item.id); if (!mounted) return; setState(() => _dailyReminders.remove(item)); await _saveDailyReminders(); }))))
+      else ..._dailyReminders.map((item) => Card(color: Colors.white, elevation: 0, margin: const EdgeInsets.only(bottom: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE8EAF0))), child: ListTile(leading: Icon(Icons.notifications_active_outlined, color: _accentColor), title: Text(item.text, maxLines: 2, overflow: TextOverflow.ellipsis), subtitle: Text(_jalaliDate(item.scheduledAt) + ' • ' + _clockTime(item.scheduledAt, withSeconds: false)), trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          IconButton(tooltip: _playingDailyReminderId == item.id ? 'توقف پخش' : 'پخش آزمایشی صدا', icon: Icon(_playingDailyReminderId == item.id ? Icons.stop_circle_outlined : Icons.play_circle_outline, color: _accentColor), onPressed: () => _playDailyReminderTest(item)),
+          IconButton(tooltip: 'حذف یادآور', icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () async { if (_playingDailyReminderId == item.id) { await _dailyReminderPreviewPlayer.stop(); _playingDailyReminderId = null; } await _notifications.cancel(item.id); if (!mounted) return; setState(() => _dailyReminders.remove(item)); await _saveDailyReminders(); })
+        ]))))
     ]);
   }
   Future<void> _openNewDailyReminder() async {
