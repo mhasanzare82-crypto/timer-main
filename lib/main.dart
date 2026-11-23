@@ -739,6 +739,7 @@ class _MainScreenState extends State<MainScreen> {
   int _nextDailyReminderId = 850000;
   final AudioPlayer _dailyReminderPreviewPlayer = AudioPlayer();
   int? _playingDailyReminderId;
+  late final StreamSubscription<void> _dailyReminderPlayerCompletionSubscription;
   Timer? _countdownTicker;
   int _wheelHours=0, _wheelMinutes=5, _wheelSeconds=0, _nextCountdownId=1000;
   late final FixedExtentScrollController _hoursWheelController;
@@ -759,6 +760,9 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    _dailyReminderPlayerCompletionSubscription = _dailyReminderPreviewPlayer.onPlayerComplete.listen((_) {
+      if (mounted && _playingDailyReminderId != null) setState(() => _playingDailyReminderId = null);
+    });
     _hoursWheelController = FixedExtentScrollController(initialItem: _wheelHours);
     _minutesWheelController = FixedExtentScrollController(initialItem: _wheelMinutes);
     _secondsWheelController = FixedExtentScrollController(initialItem: _wheelSeconds);
@@ -777,6 +781,7 @@ class _MainScreenState extends State<MainScreen> {
     _clock?.cancel();
     _countdownTicker?.cancel();
     _customAlarmPlayer.dispose();
+    _dailyReminderPlayerCompletionSubscription.cancel();
     _dailyReminderPreviewPlayer.dispose();
     _hoursWheelController.dispose();
     _minutesWheelController.dispose();
@@ -2432,11 +2437,6 @@ class _MainScreenState extends State<MainScreen> {
       final path = item.soundPath;
       if (path != null && File(path).existsSync()) {
         if (mounted) setState(() => _playingDailyReminderId = item.id);
-        player.onPlayerComplete.listen((_) {
-          if (mounted && _playingDailyReminderId == item.id) {
-            setState(() => _playingDailyReminderId = null);
-          }
-        });
         await player.play(DeviceFileSource(path));
       } else {
         SystemSound.play(SystemSoundType.alert);
