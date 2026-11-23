@@ -10,29 +10,28 @@ import 'package:shamsi_date/shamsi_date.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 class _Reminder {
-  final int id; final String text, repeat, date; final int hour, minute; final List<int> days; final bool enabled; final String? soundPath, soundName;
-  const _Reminder({required this.id,required this.text,required this.repeat,required this.date,required this.hour,required this.minute,required this.days,required this.enabled,this.soundPath,this.soundName});
-  Map<String,dynamic> toJson()=>{'id':id,'text':text,'repeat':repeat,'date':date,'hour':hour,'minute':minute,'days':days,'enabled':enabled,'soundPath':soundPath,'soundName':soundName};
-  factory _Reminder.fromJson(Map<String,dynamic> j)=>_Reminder(id:(j['id'] as num?)?.toInt()??DateTime.now().millisecondsSinceEpoch%10000000,text:j['text'] as String? ?? '',repeat:j['repeat'] as String? ?? 'once',date:j['date'] as String? ?? '',hour:(j['hour'] as num?)?.toInt()??8,minute:(j['minute'] as num?)?.toInt()??0,days:(j['days'] as List? ?? []).whereType<num>().map((e)=>e.toInt()).toList(),enabled:j['enabled'] as bool? ?? true,soundPath:j['soundPath'] as String?,soundName:j['soundName'] as String?);
+  final int id; final String text, repeat, date; final int hour, minute; final List<int> days; final bool enabled;
+  const _Reminder({required this.id,required this.text,required this.repeat,required this.date,required this.hour,required this.minute,required this.days,required this.enabled,});
+  Map<String,dynamic> toJson()=>{'id':id,'text':text,'repeat':repeat,'date':date,'hour':hour,'minute':minute,'days':days,'enabled':enabled};
+  factory _Reminder.fromJson(Map<String,dynamic> j)=>_Reminder(id:(j['id'] as num?)?.toInt()??DateTime.now().millisecondsSinceEpoch%10000000,text:j['text'] as String? ?? '',repeat:j['repeat'] as String? ?? 'once',date:j['date'] as String? ?? '',hour:(j['hour'] as num?)?.toInt()??8,minute:(j['minute'] as num?)?.toInt()??0,days:(j['days'] as List? ?? []).whereType<num>().map((e)=>e.toInt()).toList(),enabled:j['enabled'] as bool? ?? true,);
 }
 class _ReminderDraft {
-  final String text, repeat, date; final int hour, minute; final List<int> days; final String? soundPath, soundName, soundSourcePath;
-  const _ReminderDraft(this.text,this.repeat,this.date,this.hour,this.minute,this.days,this.soundPath,this.soundName,this.soundSourcePath);
+  final String text, repeat, date; final int hour, minute; final List<int> days;
+  const _ReminderDraft(this.text,this.repeat,this.date,this.hour,this.minute,this.days);
 }
 class _ReminderEditor extends StatefulWidget {
-  final _Reminder? original; final String initialDate;
-  const _ReminderEditor({required this.original,required this.initialDate});
+  final _Reminder? original; final String initialDate; final Future<void> Function() onPickSharedSound; final String? sharedSoundName;
+  const _ReminderEditor({required this.original,required this.initialDate,required this.onPickSharedSound,required this.sharedSoundName});
   @override State<_ReminderEditor> createState()=>_ReminderEditorState();
 }
 class _ReminderEditorState extends State<_ReminderEditor> {
   late final TextEditingController _text,_date;
-  late String _repeat; late int _hour,_minute; late Set<int> _days; String? _soundPath,_soundName,_soundSourcePath;
+  late String _repeat; late int _hour,_minute; late Set<int> _days;
   static const _dayNames=['دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه','یکشنبه'];
-  @override void initState(){super.initState();final r=widget.original;_text=TextEditingController(text:r?.text??'');_date=TextEditingController(text:r?.date??widget.initialDate);_repeat=r?.repeat??'once';_hour=r?.hour??TimeOfDay.now().hour;_minute=r?.minute??TimeOfDay.now().minute;_days={...?r?.days};_soundPath=r?.soundPath;_soundName=r?.soundName;}
+  @override void initState(){super.initState();final r=widget.original;_text=TextEditingController(text:r?.text??'');_date=TextEditingController(text:r?.date??widget.initialDate);_repeat=r?.repeat??'once';_hour=r?.hour??TimeOfDay.now().hour;_minute=r?.minute??TimeOfDay.now().minute;_days={...?r?.days};}
   @override void dispose(){_text.dispose();_date.dispose();super.dispose();}
   Future<void> _pickTime()async{final t=await showTimePicker(context:context,initialTime:TimeOfDay(hour:_hour,minute:_minute));if(!mounted||t==null)return;setState((){_hour=t.hour;_minute=t.minute;});}
-  Future<void> _pickSound()async{try{final picked=await FilePicker.pickFile(type:FileType.audio);if(!mounted||picked==null)return;if(picked.path==null){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('دسترسی به فایل صوتی ممکن نیست.')));return;}setState((){_soundSourcePath=picked.path;_soundName=picked.name;});}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('انتخاب فایل ناموفق بود: $e')));}}
-  void _removeSound()=>setState((){_soundPath=null;_soundName=null;_soundSourcePath=null;});
+
   @override Widget build(BuildContext context)=>AlertDialog(
     title:Text(widget.original==null?'یادآوری جدید':'ویرایش یادآوری'),
     content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.stretch,children:[
@@ -43,10 +42,9 @@ class _ReminderEditorState extends State<_ReminderEditor> {
       Visibility(visible:_repeat=='weekly',maintainState:true,child:Wrap(spacing:4,children:List.generate(7,(i)=>FilterChip(label:Text(_dayNames[i]),selected:_days.contains(i+1),onSelected:(v)=>setState(()=>v?_days.add(i+1):_days.remove(i+1)))))),
       ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.access_time),title:Text('ساعت ${_hour.toString().padLeft(2,'0')}:${_minute.toString().padLeft(2,'0')}'),onTap:_pickTime),
       const Divider(height:20),
-      ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.music_note),title:const Text('زنگ اختصاصی یادآور'),subtitle:Text(_soundName??'صدای پیش‌فرض گوشی'),trailing:IconButton(onPressed:_pickSound,icon:const Icon(Icons.folder_open),tooltip:'انتخاب فایل صوتی')),
-      if(_soundName!=null)Align(alignment:Alignment.centerLeft,child:TextButton.icon(onPressed:_removeSound,icon:const Icon(Icons.delete_outline),label:const Text('حذف زنگ اختصاصی'))),
+      ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.music_note),title:const Text('انتخاب زنگ'),subtitle:Text(widget.sharedSoundName??'صدای پیش‌فرض تایمر معکوس'),trailing:IconButton(onPressed:widget.onPickSharedSound,icon:const Icon(Icons.folder_open),tooltip:'انتخاب زنگ از حافظه گوشی')), 
     ])),
-    actions:[TextButton(onPressed:()=>Navigator.of(context).pop(),child:const Text('لغو')),FilledButton(onPressed:_text.text.trim().isNotEmpty&&(_repeat!='weekly'||_days.isNotEmpty)?()=>Navigator.of(context).pop(_ReminderDraft(_text.text.trim(),_repeat,_date.text.trim(),_hour,_minute,_days.toList()..sort(),_soundPath,_soundName,_soundSourcePath)):null,child:const Text('ذخیره'))],
+    actions:[TextButton(onPressed:()=>Navigator.of(context).pop(),child:const Text('لغو')),FilledButton(onPressed:_text.text.trim().isNotEmpty&&(_repeat!='weekly'||_days.isNotEmpty)?()=>Navigator.of(context).pop(_ReminderDraft(_text.text.trim(),_repeat,_date.text.trim(),_hour,_minute,_days.toList()..sort())):null,child:const Text('ذخیره'))],
   );
 }
 class DailyRemindersPage extends StatefulWidget {
@@ -65,7 +63,7 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
     if(expired)await _persist(List.of(_items));if(!mounted)return;setState(()=>_loading=false);if(_ready){await _syncNative(_items);for(final r in List<_Reminder>.of(_items).where((e)=>e.enabled)){await _schedule(r);}}
   }
   Future<bool> _persist(List<_Reminder> snapshot)async{try{final prefs=await SharedPreferences.getInstance();return await prefs.setString(_key,jsonEncode(snapshot.map((r)=>r.toJson()).toList()));}catch(e,st){debugPrint('Reminder persistence error: $e');debugPrintStack(stackTrace:st);return false;}}
-  _Reminder _copy(_Reminder r,{bool? enabled})=>_Reminder(id:r.id,text:r.text,repeat:r.repeat,date:r.date,hour:r.hour,minute:r.minute,days:List<int>.of(r.days),enabled:enabled??r.enabled,soundPath:r.soundPath,soundName:r.soundName);
+  _Reminder _copy(_Reminder r,{bool? enabled})=>_Reminder(id:r.id,text:r.text,repeat:r.repeat,date:r.date,hour:r.hour,minute:r.minute,days:List<int>.of(r.days),enabled:enabled??r.enabled);
   void _snack(String s){if(!mounted)return;ScaffoldMessenger.of(context)..hideCurrentSnackBar()..showSnackBar(SnackBar(content:Text(s)));}
   int _nid(_Reminder r,int suffix)=>850000+r.id*10+suffix;
   Future<void> _cancel(_Reminder r)async{for(var n=0;n<=7;n++){try{await _plugin.cancel(_nid(r,n));}catch(e){debugPrint('Reminder cancel error: $e');}}}
@@ -73,16 +71,15 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
   DateTime? _date(_Reminder r){final p=r.date.split('/');if(p.length!=3)return null;try{return Jalali(int.parse(p[0]),int.parse(p[1]),int.parse(p[2])).toDateTime();}catch(_){return null;}}
   DateTime _next(int h,int m,[int? weekday]){final now=DateTime.now();var d=DateTime(now.year,now.month,now.day,h,m);while(!d.isAfter(now)||(weekday!=null&&d.weekday!=weekday)){final n=d.add(const Duration(days:1));d=DateTime(n.year,n.month,n.day,h,m);}return d;}
   Future<bool> _ensureAlarmPermission()async{try{final android=_plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();await android?.requestNotificationsPermission();final exact=await android?.requestExactAlarmsPermission();return exact!=false;}catch(e,st){debugPrint('Exact alarm permission check failed: $e');debugPrintStack(stackTrace:st);return false;}}
-  Future<bool> _syncNative(List<_Reminder> reminders)async{try{final payload=reminders.map((r){int? triggerAtMillis;if(r.repeat=='once'){final date=_date(r);if(date!=null)triggerAtMillis=DateTime(date.year,date.month,date.day,r.hour,r.minute).millisecondsSinceEpoch;}return {'id':r.id,'text':r.text,'repeat':r.repeat,'hour':r.hour,'minute':r.minute,'days':r.days,'enabled':r.enabled,'soundPath':r.soundPath,'triggerAtMillis':triggerAtMillis};}).toList();await _alarmChannel.invokeMethod<void>('syncReminders',{'reminders':jsonEncode(payload)});return true;}catch(e,st){debugPrint('Native reminder sync error: $e');debugPrintStack(stackTrace:st);return false;}}
+  Future<bool> _syncNative(List<_Reminder> reminders)async{try{final payload=reminders.map((r){int? triggerAtMillis;if(r.repeat=='once'){final date=_date(r);if(date!=null)triggerAtMillis=DateTime(date.year,date.month,date.day,r.hour,r.minute).millisecondsSinceEpoch;}return {'id':r.id,'text':r.text,'repeat':r.repeat,'hour':r.hour,'minute':r.minute,'days':r.days,'enabled':r.enabled,'soundPath':_sharedAlarmSoundPath,'triggerAtMillis':triggerAtMillis};}).toList();await _alarmChannel.invokeMethod<void>('syncReminders',{'reminders':jsonEncode(payload)});return true;}catch(e,st){debugPrint('Native reminder sync error: $e');debugPrintStack(stackTrace:st);return false;}}
   Future<bool> _schedule(_Reminder r)async{try{await _cancel(r);if(!_ready||!r.enabled)return _ready;Future<void> add(int suffix,DateTime when,DateTimeComponents? match)async{await _plugin.zonedSchedule(_nid(r,suffix),'یادآوری روزانه',r.text,tz.TZDateTime.from(when,tz.local),_details,androidScheduleMode:AndroidScheduleMode.inexactAllowWhileIdle,matchDateTimeComponents:match,payload:'daily-reminder:${r.id}');}
     if(r.repeat=='once'){final d=_date(r);if(d==null)return false;final at=DateTime(d.year,d.month,d.day,r.hour,r.minute);if(at.isAfter(DateTime.now()))await add(0,at,null);}else if(r.repeat=='daily'){await add(0,_next(r.hour,r.minute),DateTimeComponents.time);}else{for(final day in r.days){await add(day,_next(r.hour,r.minute,day),DateTimeComponents.dayOfWeekAndTime);}}return true;
   }catch(e,st){debugPrint('Reminder scheduling error id=${r.id}: $e');debugPrintStack(stackTrace:st);return false;}}
-  Future<void> _edit([_Reminder? old])async{if(_busy||_loading)return;final j=Jalali.fromDateTime(DateTime.now());final initial='${j.year}/${j.month.toString().padLeft(2,'0')}/${j.day.toString().padLeft(2,'0')}';final draft=await showDialog<_ReminderDraft>(context:context,barrierDismissible:false,builder:(_)=>_ReminderEditor(original:old,initialDate:initial));if(draft==null||!mounted)return;
+  Future<void> _edit([_Reminder? old])async{if(_busy||_loading)return;final j=Jalali.fromDateTime(DateTime.now());final initial='${j.year}/${j.month.toString().padLeft(2,'0')}/${j.day.toString().padLeft(2,'0')}';final draft=await showDialog<_ReminderDraft>(context:context,barrierDismissible:false,builder:(_)=>_ReminderEditor(original:old,initialDate:initial,onPickSharedSound:_pickSharedAlarmSound,sharedSoundName:_sharedAlarmSoundName));if(draft==null||!mounted)return;
     if(draft.repeat=='once'){final p=draft.date.split('/');DateTime? date;if(p.length==3){try{date=Jalali(int.parse(p[0]),int.parse(p[1]),int.parse(p[2])).toDateTime();}catch(_){}}if(date==null||!DateTime(date.year,date.month,date.day,draft.hour,draft.minute).isAfter(DateTime.now())){_snack('تاریخ شمسی معتبر و زمان آینده وارد کن.');return;}}
     if(draft.repeat=='weekly'&&draft.days.isEmpty){_snack('حداقل یک روز هفته انتخاب کن.');return;}
     _busy=true;try{if((old?.enabled??true)&&!await _ensureAlarmPermission()){_snack('برای فعال‌سازی یادآور، مجوز هشدار دقیق را بده.');return;}late final int id;if(old!=null){id=old.id;}else{var candidate=DateTime.now().microsecondsSinceEpoch%10000000;while(_items.any((e)=>e.id==candidate)){candidate=(candidate+1)%10000000;}id=candidate;}
-      var soundPath=draft.soundPath;final soundName=draft.soundName;if(draft.soundSourcePath!=null){final source=File(draft.soundSourcePath!);if(!await source.exists()){_snack('فایل صوتی انتخاب‌شده در دسترس نیست؛ دوباره انتخاب کن.');return;}final support=await getApplicationSupportDirectory();final dir=Directory('${support.path}/daily_reminder_sounds');await dir.create(recursive:true);final safeName=(soundName??'reminder_audio').replaceAll(RegExp(r'[^\w. -]'),'_');final target=File('${dir.path}/${DateTime.now().microsecondsSinceEpoch}_$safeName');await source.copy(target.path);soundPath=target.path;}
-      final saved=_Reminder(id:id,text:draft.text,repeat:draft.repeat,date:draft.date,hour:draft.hour,minute:draft.minute,days:List<int>.of(draft.days),enabled:old?.enabled??true,soundPath:soundPath,soundName:soundName);
+      final saved=_Reminder(id:id,text:draft.text,repeat:draft.repeat,date:draft.date,hour:draft.hour,minute:draft.minute,days:List<int>.of(draft.days),enabled:old?.enabled??true);
       final proposed=List<_Reminder>.of(_items);final idx=proposed.indexWhere((e)=>e.id==saved.id);if(idx<0){proposed.add(saved);}else{proposed[idx]=saved;}
       // Commit storage first; only update the visible state if storage succeeds.
       if(!await _persist(proposed)){_snack('ذخیره ناموفق بود؛ داده قبلی حفظ شد.');return;}
