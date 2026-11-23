@@ -2461,10 +2461,8 @@ class _MainScreenState extends State<MainScreen> {
     await _cancelDailyReminderAlarm(item.id);
     if (!item.scheduledAt.isAfter(DateTime.now())) return;
     final android = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-    final notificationsAllowed = await android?.areNotificationsEnabled() ?? true;
-    if (!notificationsAllowed) {
-      throw StateError('اجازه اعلان برای برنامه فعال نیست.');
-    }
+    // Notification visibility is optional for alarm playback. The native
+    // foreground service still posts its required service notification.
     final exactAllowed = await android?.canScheduleExactNotifications() ?? true;
     if (!exactAllowed) {
       throw StateError('اجازه زمان‌بندی دقیق فعال نیست. از تنظیمات اندروید، دسترسی زنگ و یادآور را فعال کن.');
