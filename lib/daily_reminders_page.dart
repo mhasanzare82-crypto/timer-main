@@ -156,7 +156,7 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
         final support = await getApplicationSupportDirectory();
         final soundsDir = Directory('${support.path}/daily_reminder_sounds');
         await soundsDir.create(recursive: true);
-        final safeName = (draft.soundName ?? 'reminder_audio').replaceAll(RegExp(r'[^\\w. -]'), '_');
+        final safeName = (draft.soundName ?? 'reminder_audio').replaceAll(RegExp(r'[^\w. -]'), '_');
         final target = File('${soundsDir.path}/${DateTime.now().microsecondsSinceEpoch}_$safeName');
         await source.copy(target.path);
         soundPath = target.path;
@@ -195,7 +195,7 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
                             isThreeLine: true,
                             title: Text(r.text, maxLines: 4, overflow: TextOverflow.ellipsis),
                             subtitle: Text(
-                              '${r.hour.toString().padLeft(2, '0')}:${r.minute.toString().padLeft(2, '0')} • ${_repeat(r)}${r.soundName == null ? '' : '\\n🎵 ${r.soundName}'}',
+                              '${r.hour.toString().padLeft(2, '0')}:${r.minute.toString().padLeft(2, '0')} • ${_repeat(r)}${r.soundName == null ? '' : '\n🎵 ${r.soundName}'}',
                             ),
                             leading: Switch(
                               value: r.enabled,
