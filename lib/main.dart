@@ -529,6 +529,16 @@ class _SavedAlarm {
  Map<String,dynamic> toJson()=>{'id':id,'title':title,'hour':hour,'minute':minute,'date':date.toIso8601String(),'weekdays':weekdays,'sound':sound,'enabled':enabled};
  factory _SavedAlarm.fromJson(Map<String,dynamic> j)=>_SavedAlarm(id:j['id'] as int,title:j['title'] as String? ?? 'زنگ هشدار',hour:j['hour'] as int? ?? 8,minute:j['minute'] as int? ?? 0,date:DateTime.tryParse(j['date'] as String? ?? '')??DateTime.now(),weekdays:(j['weekdays'] as List? ?? []).map((x)=>x as int).toList(),sound:j['sound'] as String?,enabled:j['enabled'] as bool? ?? true);
 }
+class _DailyReminder {
+  int id;
+  String text;
+  DateTime scheduledAt;
+  String? soundPath;
+  _DailyReminder({required this.id, required this.text, required this.scheduledAt, this.soundPath});
+  Map<String, dynamic> toJson() => {'id': id, 'text': text, 'scheduledAt': scheduledAt.toIso8601String(), 'soundPath': soundPath};
+  factory _DailyReminder.fromJson(Map<String, dynamic> json) => _DailyReminder(id: json['id'] as int, text: json['text'] as String? ?? '', scheduledAt: DateTime.tryParse(json['scheduledAt'] as String? ?? '') ?? DateTime.now(), soundPath: json['soundPath'] as String?);
+}
+
 class _AlarmsPage extends StatefulWidget { const _AlarmsPage(); @override State<_AlarmsPage> createState()=>_AlarmsPageState(); }
 class _AlarmsPageState extends State<_AlarmsPage>{
  static const key='independent_alarms_v1'; final items=<_SavedAlarm>[]; final player=AudioPlayer(); bool loading=true;
@@ -701,6 +711,7 @@ class _MainScreenState extends State<MainScreen> {
   static const _categoriesStorageKey = 'activity_categories_v1';
   static const _runningActivitiesStorageKey = 'running_activities_v1';
   static const _countdownsStorageKey = 'countdown_timers_v1';
+  static const _dailyRemindersStorageKey = 'daily_reminders_simple_v1';
   static const _tabTitles = ['ثبت زمان', 'فعالیت‌ها', 'گزارش‌گیری', 'تایمر معکوس', 'یادآوری‌های روزانه'];
   static const _colors = [
     Color(0xFF356AE6),
@@ -724,6 +735,9 @@ class _MainScreenState extends State<MainScreen> {
   DateTime? _reportEndDate;
   final Set<String> _reportSelectedNames = {};
   final List<_CountdownTimer> _countdowns=[];
+  final List<_DailyReminder> _dailyReminders = [];
+  int _nextDailyReminderId = 850000;
+  final AudioPlayer _dailyReminderPreviewPlayer = AudioPlayer();
   Timer? _countdownTicker;
   int _wheelHours=0, _wheelMinutes=5, _wheelSeconds=0, _nextCountdownId=1000;
   late final FixedExtentScrollController _hoursWheelController;
@@ -754,6 +768,7 @@ class _MainScreenState extends State<MainScreen> {
     _initializeData();
     _clearRemovedChecklistData();
     _initializeAlarmNotifications();
+    _loadDailyReminders();
     _countdownTicker=Timer.periodic(const Duration(seconds:1), (_) => _tickCountdowns());
   }
 
@@ -762,6 +777,7 @@ class _MainScreenState extends State<MainScreen> {
     _clock?.cancel();
     _countdownTicker?.cancel();
     _customAlarmPlayer.dispose();
+    _dailyReminderPreviewPlayer.dispose();
     _hoursWheelController.dispose();
     _minutesWheelController.dispose();
     _secondsWheelController.dispose();
@@ -1561,7 +1577,7 @@ class _MainScreenState extends State<MainScreen> {
           _buildActivitiesPage(),
           _buildReportsPage(),
           _buildCountdownPage(),
-          const Scaffold(body: SizedBox.shrink()),
+          _buildDailyRemindersPage(),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -2388,6 +2404,48 @@ class _MainScreenState extends State<MainScreen> {
     await _persistCountdowns();
   }
 
+  Future<void> _loadDailyReminders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_dailyRemindersStorageKey);
+    if (raw == null) return;
+    try {
+      final decoded = (jsonDecode(raw) as List<dynamic>).map((item) => _DailyReminder.fromJson(Map<String, dynamic>.from(item as Map))).toList();
+      if (!mounted) return;
+      setState(() { _dailyReminders..clear()..addAll(decoded); _nextDailyReminderId = _dailyReminders.isEmpty ? 850000 : _dailyReminders.map((item) => item.id).reduce((a, b) => a > b ? a : b) + 1; });
+      for (final item in decoded) { await _scheduleDailyReminder(item); }
+    } catch (_) { }
+  }
+  Future<void> _saveDailyReminders() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_dailyRemindersStorageKey, jsonEncode(_dailyReminders.map((item) => item.toJson()).toList()));
+  }
+  Future<void> _scheduleDailyReminder(_DailyReminder item) async {
+    await _notifications.cancel(item.id);
+    if (!item.scheduledAt.isAfter(DateTime.now())) return;
+    final soundPath = item.soundPath;
+    final channel = soundPath == null ? 'daily_reminder_default' : 'daily_reminder_' + item.id.toString();
+    final sound = soundPath != null && File(soundPath).existsSync() ? UriAndroidNotificationSound(Uri.file(soundPath).toString()) : null;
+    final details = AndroidNotificationDetails(channel, 'یادآورهای شخصی', channelDescription: 'اعلان یادآورهای ثبت‌شده', importance: Importance.max, priority: Priority.max, category: AndroidNotificationCategory.alarm, playSound: true, sound: sound, audioAttributesUsage: AudioAttributesUsage.alarm);
+    await _notifications.zonedSchedule(item.id, 'یادآور', item.text, tz.TZDateTime.from(item.scheduledAt, tz.local), NotificationDetails(android: details), androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, payload: 'daily-reminder:' + item.id.toString());
+  }
+  Widget _buildDailyRemindersPage() {
+    return ListView(padding: const EdgeInsets.all(16), children: [
+      SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _openNewDailyReminder, icon: const Icon(Icons.add_alert), label: const Text('یادآور جدید'), style: FilledButton.styleFrom(backgroundColor: _accentColor, padding: const EdgeInsets.symmetric(vertical: 14)))),
+      const SizedBox(height: 14),
+      if (_dailyReminders.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: 36), child: Center(child: Text('هنوز یادآوری‌ای ثبت نشده است.')))
+      else ..._dailyReminders.map((item) => Card(color: Colors.white, elevation: 0, margin: const EdgeInsets.only(bottom: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE8EAF0))), child: ListTile(leading: Icon(Icons.notifications_active_outlined, color: _accentColor), title: Text(item.text, maxLines: 2, overflow: TextOverflow.ellipsis), subtitle: Text(_jalaliDate(item.scheduledAt) + ' • ' + _clockTime(item.scheduledAt, withSeconds: false)), trailing: IconButton(tooltip: 'حذف یادآور', icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () async { await _notifications.cancel(item.id); if (!mounted) return; setState(() => _dailyReminders.remove(item)); await _saveDailyReminders(); }))))
+    ]);
+  }
+  Future<void> _openNewDailyReminder() async {
+    final item = await Navigator.of(context).push<_DailyReminder>(MaterialPageRoute(builder: (_) => const _DailyReminderFormPage()));
+    if (item == null || !mounted) return;
+    item.id = _nextDailyReminderId++;
+    setState(() => _dailyReminders.add(item));
+    await _saveDailyReminders();
+    await _scheduleDailyReminder(item);
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('یادآور ذخیره و زمان‌بندی شد.'));
+  }
+
   Future<void> _finishCountdown(_CountdownTimer item) async {
     await _recordCountdownCompletion(item);
     await _notifications.cancel(item.id);
@@ -2705,4 +2763,34 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
   }
+}class _DailyReminderFormPage extends StatefulWidget {
+  const _DailyReminderFormPage();
+  @override State<_DailyReminderFormPage> createState() => _DailyReminderFormPageState();
+}
+class _DailyReminderFormPageState extends State<_DailyReminderFormPage> {
+  final _text = TextEditingController();
+  final _player = AudioPlayer();
+  DateTime _date = DateTime.now();
+  TimeOfDay _time = TimeOfDay.fromDateTime(DateTime.now().add(const Duration(minutes: 5)));
+  String? _soundPath;
+  @override void dispose() { _text.dispose(); _player.dispose(); super.dispose(); }
+  DateTime get _when => DateTime(_date.year, _date.month, _date.day, _time.hour, _time.minute);
+  String _dateText(DateTime date) { final j = Jalali.fromDateTime(date); return j.year.toString() + '/' + j.month.toString().padLeft(2, '0') + '/' + j.day.toString().padLeft(2, '0'); }
+  Future<void> _pickDate() async { final d = await showDatePicker(context: context, initialDate: _date.isBefore(DateTime.now()) ? DateTime.now() : _date, firstDate: DateTime.now(), lastDate: DateTime(2100)); if (d != null && mounted) setState(() => _date = d); }
+  Future<void> _pickTime() async { final t = await showTimePicker(context: context, initialTime: _time); if (t != null && mounted) setState(() => _time = t); }
+  Future<void> _pickSound() async {
+    final file = await FilePicker.pickFile(type: FileType.audio);
+    if (file == null || file.path == null) return;
+    try { final dir = await getApplicationSupportDirectory(); final name = file.path!.split('/').last; final copied = await File(file.path!).copy(dir.path + '/reminder_sound_' + DateTime.now().millisecondsSinceEpoch.toString() + '_' + name); if (mounted) setState(() => _soundPath = copied.path); }
+    catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ذخیره فایل زنگ انجام نشد.'))); }
+  }
+  Future<void> _preview() async { final p = _soundPath; if (p == null || !File(p).existsSync()) return; try { await _player.stop(); await _player.play(DeviceFileSource(p)); } catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('پخش زنگ ممکن نشد.'))); } }
+  void _save() { final text = _text.text.trim(); if (text.isEmpty) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('متن یادآور را وارد کن.'))); return; } if (!_when.isAfter(DateTime.now())) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تاریخ و ساعت باید در آینده باشد.'))); return; } Navigator.of(context).pop(_DailyReminder(id: 0, text: text, scheduledAt: _when, soundPath: _soundPath)); }
+  @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('یادآور جدید')), body: ListView(padding: const EdgeInsets.all(16), children: [
+    TextField(controller: _text, minLines: 3, maxLines: 6, maxLength: 300, decoration: const InputDecoration(labelText: 'متن یادآور', hintText: 'چه چیزی را می‌خواهی به خاطر بسپاری؟', border: OutlineInputBorder())),
+    const SizedBox(height: 8), Card(color: Colors.white, elevation: 0, child: ListTile(leading: const Icon(Icons.calendar_month_outlined), title: const Text('تاریخ'), subtitle: Text(_dateText(_date)), trailing: const Icon(Icons.chevron_left), onTap: _pickDate)),
+    Card(color: Colors.white, elevation: 0, child: ListTile(leading: const Icon(Icons.access_time), title: const Text('ساعت'), subtitle: Text(_time.format(context)), trailing: const Icon(Icons.chevron_left), onTap: _pickTime)),
+    Card(color: Colors.white, elevation: 0, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [const Text('زنگ هشدار', style: TextStyle(fontWeight: FontWeight.w600)), const SizedBox(height: 4), Text(_soundPath == null ? 'زنگ پیش‌فرض' : _soundPath!.split('/').last, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black54)), Row(children: [Expanded(child: OutlinedButton.icon(onPressed: _pickSound, icon: const Icon(Icons.folder_open), label: const Text('انتخاب زنگ از حافظه گوشی'))), if (_soundPath != null) IconButton(tooltip: 'پخش آزمایشی زنگ', onPressed: _preview, icon: const Icon(Icons.play_circle_outline))]), if (_soundPath != null) TextButton.icon(onPressed: () => setState(() => _soundPath = null), icon: const Icon(Icons.delete_outline), label: const Text('بازگشت به زنگ پیش‌فرض'))]))),
+    const SizedBox(height: 18), FilledButton.icon(onPressed: _save, icon: const Icon(Icons.save_outlined), label: const Text('ذخیره یادآور'), style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)))
+  ]));
 }
