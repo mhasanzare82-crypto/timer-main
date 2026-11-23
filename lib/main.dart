@@ -2460,7 +2460,13 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _scheduleDailyReminder(_DailyReminder item) async {
     await _cancelDailyReminderAlarm(item.id);
-    if (!item.scheduledAt.isAfter(DateTime.now())) return;
+    var nextScheduledAt = item.scheduledAt;
+    final now = DateTime.now();
+    if (!nextScheduledAt.isAfter(now)) {
+      if (!item.repeatDaily) return;
+      nextScheduledAt = DateTime(now.year, now.month, now.day, item.scheduledAt.hour, item.scheduledAt.minute);
+      if (!nextScheduledAt.isAfter(now)) nextScheduledAt = nextScheduledAt.add(const Duration(days: 1));
+    }
     final android = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     // Notification visibility is optional for alarm playback. The native
     // foreground service still posts its required service notification.
@@ -2473,7 +2479,7 @@ class _MainScreenState extends State<MainScreen> {
     final validSoundPath = soundPath != null && await File(soundPath).exists() ? soundPath : null;
     await _dailyReminderAlarmChannel.invokeMethod<void>('schedule', {
       'id': item.id,
-      'scheduledAtMillis': item.scheduledAt.millisecondsSinceEpoch,
+      'scheduledAtMillis': nextScheduledAt.millisecondsSinceEpoch,
       'soundPath': validSoundPath,
       'text': item.text,
       'repeatDaily': item.repeatDaily,
@@ -2495,7 +2501,7 @@ class _MainScreenState extends State<MainScreen> {
       item.id,
       'یادآور',
       item.text,
-      tz.TZDateTime.from(item.scheduledAt, tz.local),
+      tz.TZDateTime.from(nextScheduledAt, tz.local),
       const NotificationDetails(android: details),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       matchDateTimeComponents: item.repeatDaily ? DateTimeComponents.time : null,
