@@ -17,13 +17,37 @@ internal object DailyReminderAlarmScheduler {
     fun sync(context: Context, json: String) {
         val prefs = context.getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE)
         val previous = runCatching { JSONArray(prefs.getString(PREF_JSON, "[]")) }.getOrDefault(JSONArray())
-        for (i in 0 until previous.length()) cancel(context, previous.optJSONObject(i)?.optInt("id") ?: continue)
+        val current = JSONArray(json)
+        val previousById = (0 until previous.length()).mapNotNull { index ->
+            previous.optJSONObject(index)?.let { it.optInt("id") to it }
+        }.toMap()
+        val currentById = (0 until current.length()).mapNotNull { index ->
+            current.optJSONObject(index)?.let { it.optInt("id") to it }
+        }.toMap()
+
+        // Only touch alarms whose reminder was added, removed, or actually changed.
+        // This avoids cancelling and recreating every alarm when one switch changes.
+        for ((id, oldReminder) in previousById) {
+            val newReminder = currentById[id]
+            if (newReminder == null || oldReminder.toString() != newReminder.toString()) {
+                cancel(context, id)
+            }
+        }
+        for ((id, newReminder) in currentById) {
+            val oldReminder = previousById[id]
+            if (oldReminder == null || oldReminder.toString() != newReminder.toString()) {
+                schedule(context, newReminder)
+            }
+        }
+
         prefs.edit().putString(PREF_JSON, json).apply()
-        val reminders = JSONArray(json)
-        for (i in 0 until reminders.length()) schedule(context, reminders.optJSONObject(i) ?: continue)
-        val ringingId = context.getSharedPreferences(DailyReminderRingingService.PREF_FILE, Context.MODE_PRIVATE).getInt(DailyReminderRingingService.ACTIVE_ID_KEY, -1)
-        if (ringingId >= 0 && (0 until reminders.length()).none { reminders.optJSONObject(it)?.let { r -> r.optInt("id") == ringingId && r.optBoolean("enabled", false) } == true }) {
-            context.startService(Intent(context, DailyReminderRingingService::class.java).apply { action = DailyReminderRingingService.STOP_ACTION })
+        val ringingId = context.getSharedPreferences(
+            DailyReminderRingingService.PREF_FILE, Context.MODE_PRIVATE
+        ).getInt(DailyReminderRingingService.ACTIVE_ID_KEY, -1)
+        if (ringingId >= 0 && currentById[ringingId]?.optBoolean("enabled", false) != true) {
+            context.startService(Intent(context, DailyReminderRingingService::class.java).apply {
+                action = DailyReminderRingingService.STOP_ACTION
+            })
         }
     }
 
