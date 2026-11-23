@@ -21,6 +21,10 @@ internal object DailyReminderAlarmScheduler {
         prefs.edit().putString(PREF_JSON, json).apply()
         val reminders = JSONArray(json)
         for (i in 0 until reminders.length()) schedule(context, reminders.optJSONObject(i) ?: continue)
+        val ringingId = context.getSharedPreferences(DailyReminderRingingService.PREF_FILE, Context.MODE_PRIVATE).getInt(DailyReminderRingingService.ACTIVE_ID_KEY, -1)
+        if (ringingId >= 0 && (0 until reminders.length()).none { reminders.optJSONObject(it)?.let { r -> r.optInt("id") == ringingId && r.optBoolean("enabled", false) } == true }) {
+            context.startService(Intent(context, DailyReminderRingingService::class.java).apply { action = DailyReminderRingingService.STOP_ACTION })
+        }
     }
 
     fun restore(context: Context) {
