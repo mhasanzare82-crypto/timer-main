@@ -84,7 +84,7 @@ class DailyReminderRingingService : Service() {
                 mp.setDataSource(this, uri)
             }
             mp.isLooping = true
-            mp.setOnErrorListener { _, _, _ -> stopAudio(); true }
+            mp.setOnErrorListener { _, _, _ -> stopAudio(); stopForegroundCompat(); stopSelf(); true }
             mp.prepare()
             mp.start()
             player = mp
@@ -100,8 +100,9 @@ class DailyReminderRingingService : Service() {
         player = null
     }
 
+    @Suppress("DEPRECATION")
     private fun stopForegroundCompat() {
-        if (Build.VERSION.SDK_INT >= 24) stopForeground(STOP_FOREGROUND_REMOVE) else @Suppress("DEPRECATION") stopForeground(true)
+        if (Build.VERSION.SDK_INT >= 24) stopForeground(STOP_FOREGROUND_REMOVE) else stopForeground(true)
     }
 
     override fun onDestroy() {
