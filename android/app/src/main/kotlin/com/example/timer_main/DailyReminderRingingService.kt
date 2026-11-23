@@ -17,9 +17,11 @@ import android.app.ServiceInfo
 
 class DailyReminderRingingService : Service() {
     companion object {
+        const val PREF_FILE = "daily_reminder_ringing_state"
+        const val ACTIVE_ID_KEY = "active_reminder_id"
+        const val STOP_ACTION = "com.example.timer_main.STOP_DAILY_REMINDER_RING"
         private const val CHANNEL = "daily_reminder_ringing"
         private const val NOTIFICATION_ID = 9731
-        private const val STOP_ACTION = "com.example.timer_main.STOP_DAILY_REMINDER_RING"
     }
     private var player: MediaPlayer? = null
 
@@ -31,12 +33,14 @@ class DailyReminderRingingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == STOP_ACTION) {
             stopAudio()
+            clearActiveReminder()
             stopForegroundCompat()
             stopSelf()
             return START_NOT_STICKY
         }
         val text = intent?.getStringExtra("reminderText") ?: "یادآوری"
         val id = intent?.getIntExtra("reminderId", 0) ?: 0
+        getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE).edit().putInt(ACTIVE_ID_KEY, id).apply()
         val stopIntent = Intent(this, DailyReminderRingingService::class.java).apply { action = STOP_ACTION }
         val stopPending = PendingIntent.getService(this, 9732, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag())
         val notification = buildNotification(text, stopPending)
@@ -84,7 +88,7 @@ class DailyReminderRingingService : Service() {
                 mp.setDataSource(this, uri)
             }
             mp.isLooping = true
-            mp.setOnErrorListener { _, _, _ -> stopAudio(); stopForegroundCompat(); stopSelf(); true }
+            mp.setOnErrorListener { _, _, _ -> stopAudio(); clearActiveReminder(); stopForegroundCompat(); stopSelf(); true }
             mp.prepare()
             mp.start()
             player = mp
@@ -93,6 +97,8 @@ class DailyReminderRingingService : Service() {
             if (!path.isNullOrBlank()) startAudio(null)
         }
     }
+
+    private fun clearActiveReminder() { getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE).edit().remove(ACTIVE_ID_KEY).apply() }
 
     private fun stopAudio() {
         try { player?.stop() } catch (_: Exception) {}
@@ -107,6 +113,7 @@ class DailyReminderRingingService : Service() {
 
     override fun onDestroy() {
         stopAudio()
+        clearActiveReminder()
         super.onDestroy()
     }
 
