@@ -26,10 +26,11 @@ class _ReminderEditor extends StatefulWidget {
 }
 class _ReminderEditorState extends State<_ReminderEditor> {
   late final TextEditingController _text,_date;
-  late String _repeat; late int _hour,_minute; late Set<int> _days;
+  late String _repeat; late int _hour,_minute; late Set<int> _days; String? _sharedSoundLabel;
   static const _dayNames=['دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه','یکشنبه'];
-  @override void initState(){super.initState();final r=widget.original;_text=TextEditingController(text:r?.text??'');_date=TextEditingController(text:r?.date??widget.initialDate);_repeat=r?.repeat??'once';_hour=r?.hour??TimeOfDay.now().hour;_minute=r?.minute??TimeOfDay.now().minute;_days={...?r?.days};}
+  @override void initState(){super.initState();final r=widget.original;_text=TextEditingController(text:r?.text??'');_date=TextEditingController(text:r?.date??widget.initialDate);_repeat=r?.repeat??'once';_hour=r?.hour??TimeOfDay.now().hour;_minute=r?.minute??TimeOfDay.now().minute;_days={...?r?.days};_sharedSoundLabel=widget.sharedSoundName;}
   @override void dispose(){_text.dispose();_date.dispose();super.dispose();}
+  Future<void> _chooseSharedSound()async{await widget.onPickSharedSound();if(!mounted)return;final prefs=await SharedPreferences.getInstance();final path=prefs.getString('countdown_custom_sound_path');setState(()=>_sharedSoundLabel=path?.split(RegExp(r'[/\\]')).last);}
   Future<void> _pickTime()async{final t=await showTimePicker(context:context,initialTime:TimeOfDay(hour:_hour,minute:_minute));if(!mounted||t==null)return;setState((){_hour=t.hour;_minute=t.minute;});}
 
   @override Widget build(BuildContext context)=>AlertDialog(
@@ -42,7 +43,7 @@ class _ReminderEditorState extends State<_ReminderEditor> {
       Visibility(visible:_repeat=='weekly',maintainState:true,child:Wrap(spacing:4,children:List.generate(7,(i)=>FilterChip(label:Text(_dayNames[i]),selected:_days.contains(i+1),onSelected:(v)=>setState(()=>v?_days.add(i+1):_days.remove(i+1)))))),
       ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.access_time),title:Text('ساعت ${_hour.toString().padLeft(2,'0')}:${_minute.toString().padLeft(2,'0')}'),onTap:_pickTime),
       const Divider(height:20),
-      ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.music_note),title:const Text('انتخاب زنگ'),subtitle:Text(widget.sharedSoundName??'صدای پیش‌فرض تایمر معکوس'),trailing:IconButton(onPressed:widget.onPickSharedSound,icon:const Icon(Icons.folder_open),tooltip:'انتخاب زنگ از حافظه گوشی')), 
+      ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.music_note),title:const Text('انتخاب زنگ'),subtitle:Text(_sharedSoundLabel??'صدای پیش‌فرض تایمر معکوس'),trailing:IconButton(onPressed:_chooseSharedSound,icon:const Icon(Icons.folder_open),tooltip:'انتخاب زنگ از حافظه گوشی')), 
     ])),
     actions:[TextButton(onPressed:()=>Navigator.of(context).pop(),child:const Text('لغو')),FilledButton(onPressed:_text.text.trim().isNotEmpty&&(_repeat!='weekly'||_days.isNotEmpty)?()=>Navigator.of(context).pop(_ReminderDraft(_text.text.trim(),_repeat,_date.text.trim(),_hour,_minute,_days.toList()..sort())):null,child:const Text('ذخیره'))],
   );
