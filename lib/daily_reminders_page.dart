@@ -28,7 +28,14 @@ class _ReminderEditorState extends State<_ReminderEditor> {
   static const _dayNames=['دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه','یکشنبه'];
   @override void initState(){super.initState();final r=widget.original;_text=TextEditingController(text:r?.text??'');_date=TextEditingController(text:r?.date??widget.initialDate);_repeat=r?.repeat??'once';_hour=r?.hour??TimeOfDay.now().hour;_minute=r?.minute??TimeOfDay.now().minute;_days={...?r?.days};_soundPath=r?.soundPath;}
   @override void dispose(){_text.dispose();_date.dispose();super.dispose();}
-  Future<void> _pickSound()async{final result=await FilePicker.platform.pickFiles(type:FileType.audio,allowMultiple:false);if(!mounted||result==null||result.files.isEmpty)return;final path=result.files.single.path;if(path==null)return;setState(()=>_soundPath=path);}
+  Future<void> _pickSound() async {
+    // file_picker 13.x exposes the static pickFile API.
+    final selected = await FilePicker.pickFile(type: FileType.audio);
+    if (!mounted || selected == null) return;
+    final path = selected.path;
+    if (path == null || path.isEmpty) return;
+    setState(() => _soundPath = path);
+  }
   Future<void> _pickTime()async{final t=await showTimePicker(context:context,initialTime:TimeOfDay(hour:_hour,minute:_minute));if(!mounted||t==null)return;setState((){_hour=t.hour;_minute=t.minute;});}
   @override Widget build(BuildContext context)=>AlertDialog(
     title:Text(widget.original==null?'یادآوری جدید':'ویرایش یادآوری'),
@@ -63,7 +70,16 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
   _Reminder _copy(_Reminder r,{bool? enabled})=>_Reminder(id:r.id,text:r.text,repeat:r.repeat,date:r.date,hour:r.hour,minute:r.minute,days:List<int>.of(r.days),enabled:enabled??r.enabled,soundPath:r.soundPath);
   void _snack(String s){if(!mounted)return;ScaffoldMessenger.of(context)..hideCurrentSnackBar()..showSnackBar(SnackBar(content:Text(s)));}
   int _nid(_Reminder r,int suffix)=>850000+r.id*10+suffix;
-  Future<void> _cancel(_Reminder r)async{for(var n=0;n<=7;n++){try{await _plugin.cancel(_nid(r,n));}catch(e){debugPrint('Reminder cancel error: $e');}}}
+  Future<void> _cancel(_Reminder r) async {
+    // Cancel IDs concurrently and isolate errors so one failure doesn't stop the rest.
+    await Future.wait(List.generate(8, (suffix) async {
+      try {
+        await _plugin.cancel(_nid(r, suffix));
+      } catch (error) {
+        debugPrint('Reminder cancel error id=${r.id}, suffix=$suffix: $error');
+      }
+    }));
+  }
   NotificationDetails get _details=>const NotificationDetails(android:AndroidNotificationDetails('daily_reminders_channel','یادآوری‌های روزانه',importance:Importance.max,priority:Priority.max,category:AndroidNotificationCategory.reminder));
   DateTime? _date(_Reminder r){final p=r.date.split('/');if(p.length!=3)return null;try{return Jalali(int.parse(p[0]),int.parse(p[1]),int.parse(p[2])).toDateTime();}catch(_){return null;}}
   DateTime _next(int h,int m,[int? weekday]){final now=DateTime.now();var d=DateTime(now.year,now.month,now.day,h,m);while(!d.isAfter(now)||(weekday!=null&&d.weekday!=weekday)){final n=d.add(const Duration(days:1));d=DateTime(n.year,n.month,n.day,h,m);}return d;}
