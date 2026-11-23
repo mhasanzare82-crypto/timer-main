@@ -81,7 +81,7 @@ internal object DailyReminderAlarmScheduler {
     }
 
     fun scheduleNextDailyOccurrence(context: Context, intent: Intent) {
-        if (!intent.getBooleanExtra(EXTRA_REPEAT_DAILY, false)) return
+        if (!intent.getBooleanExtra(DailyReminderAlarmReceiver.EXTRA_REPEAT_DAILY, false)) return
         val id = intent.getIntExtra(DailyReminderAlarmReceiver.EXTRA_ID, 0)
         val triggerAt = intent.getLongExtra(DailyReminderAlarmReceiver.EXTRA_TRIGGER_AT, 0L)
         if (id == 0 || triggerAt <= 0L) return
