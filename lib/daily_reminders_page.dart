@@ -267,36 +267,42 @@ class _DailyRemindersPageState extends State<DailyRemindersPage> {
           ? const Center(child: CircularProgressIndicator())
           : _items.isEmpty
               ? const Center(child: Text('هنوز یادآوری‌ای ثبت نکرده‌ای.'))
-              : ListView(
+              : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 90),
-                  children: [
-                    if (!_ready)
-                      const Text(
-                        'مجوز اعلان و زمان‌بندی دقیق را در تنظیمات گوشی بررسی کن.',
-                        style: TextStyle(color: Colors.red),
+                  itemCount: _items.length + (_ready ? 0 : 1),
+                  itemBuilder: (context, index) {
+                    if (!_ready && index == 0) {
+                      return const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Text(
+                          'مجوز اعلان و زمان‌بندی دقیق را در تنظیمات گوشی بررسی کن.',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      );
+                    }
+                    final r = _items[index - (_ready ? 0 : 1)];
+                    return Card(
+                      child: ListTile(
+                        isThreeLine: true,
+                        title: Text(r.text, maxLines: 4, overflow: TextOverflow.ellipsis),
+                        subtitle: Text(
+                          '${r.hour.toString().padLeft(2, '0')}:${r.minute.toString().padLeft(2, '0')} • ${_repeat(r)}',
+                        ),
+                        leading: Switch(
+                          value: r.enabled,
+                          onChanged: _busy || _toggleBusy ? null : (v) => _toggle(r, v),
+                        ),
+                        trailing: PopupMenuButton<String>(
+                          enabled: !_busy,
+                          onSelected: (v) => v == 'edit' ? _edit(r) : _delete(r),
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(value: 'edit', child: Text('ویرایش')),
+                            PopupMenuItem(value: 'delete', child: Text('حذف')),
+                          ],
+                        ),
                       ),
-                    ..._items.map((r) => Card(
-                          child: ListTile(
-                            isThreeLine: true,
-                            title: Text(r.text, maxLines: 4, overflow: TextOverflow.ellipsis),
-                            subtitle: Text(
-                              '${r.hour.toString().padLeft(2, '0')}:${r.minute.toString().padLeft(2, '0')} • ${_repeat(r)}',
-                            ),
-                            leading: Switch(
-                              value: r.enabled,
-                              onChanged: _busy || _toggleBusy ? null : (v) => _toggle(r, v),
-                            ),
-                            trailing: PopupMenuButton<String>(
-                              enabled: !_busy,
-                              onSelected: (v) => v == 'edit' ? _edit(r) : _delete(r),
-                              itemBuilder: (_) => const [
-                                PopupMenuItem(value: 'edit', child: Text('ویرایش')),
-                                PopupMenuItem(value: 'delete', child: Text('حذف')),
-                              ],
-                            ),
-                          ),
-                        )),
-                  ],
+                    );
+                  },
                 ),
     );
   }
