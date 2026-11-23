@@ -7,6 +7,9 @@ import android.os.Build
 
 class DailyReminderAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // Queue tomorrow's occurrence before starting audio playback, so a long-running
+        // foreground alarm service cannot prevent the next daily alarm from being armed.
+        DailyReminderAlarmScheduler.scheduleNextDailyOccurrence(context, intent)
         val serviceIntent = Intent(context, DailyReminderAlarmService::class.java).apply {
             action = DailyReminderAlarmService.ACTION_START
             putExtra(EXTRA_ID, intent.getIntExtra(EXTRA_ID, 0))
@@ -25,5 +28,6 @@ class DailyReminderAlarmReceiver : BroadcastReceiver() {
         const val EXTRA_TRIGGER_AT = "daily_reminder_trigger_at"
         const val EXTRA_SOUND_PATH = "daily_reminder_sound_path"
         const val EXTRA_TEXT = "daily_reminder_text"
+        const val EXTRA_REPEAT_DAILY = "daily_reminder_repeat_daily"
     }
 }
