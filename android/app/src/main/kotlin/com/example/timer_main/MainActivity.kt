@@ -63,11 +63,13 @@ class MainActivity : FlutterFragmentActivity() {
                         val title = call.argument<String>("title") ?: "آماده ثبت فعالیت جدید"
                         val elapsedSeconds = call.argument<Number>("elapsedSeconds")?.toLong() ?: 0L
                         val running = call.argument<Boolean>("running") ?: false
+                        val startedAtMillis = call.argument<Number>("startedAtMillis")?.toLong() ?: 0L
                         val serviceIntent = Intent(this, ActivityTimerNotificationService::class.java).apply {
                             action = ActivityTimerNotificationService.ACTION_UPDATE
                             putExtra(ActivityTimerNotificationService.EXTRA_TITLE, title)
                             putExtra(ActivityTimerNotificationService.EXTRA_ELAPSED_SECONDS, elapsedSeconds)
                             putExtra(ActivityTimerNotificationService.EXTRA_RUNNING, running)
+                            putExtra(ActivityTimerNotificationService.EXTRA_STARTED_AT_MILLIS, startedAtMillis)
                         }
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                             startForegroundService(serviceIntent)
