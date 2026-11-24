@@ -108,11 +108,6 @@ class ActivityTimerService : Service() {
         pauseTimer()
         prefs.edit().putBoolean(KEY_PENDING_STOP, true).apply()
 
-        val launchIntent = Intent(this, MainActivity::class.java).apply {
-            action = ACTION_OPEN_FOR_STOP
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        }
-        startActivity(launchIntent)
     }
 
     private fun clearTimer() {
@@ -153,8 +148,11 @@ class ActivityTimerService : Service() {
             this, REQUEST_TOGGLE, toggleIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val stopIntent = Intent(this, ActivityTimerService::class.java).apply { action = ACTION_STOP }
-        val stopPending = PendingIntent.getService(
+        val stopIntent = Intent(this, MainActivity::class.java).apply {
+            action = ACTION_OPEN_FOR_STOP
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        val stopPending = PendingIntent.getActivity(
             this, REQUEST_STOP, stopIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
