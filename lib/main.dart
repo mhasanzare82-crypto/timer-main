@@ -1530,7 +1530,7 @@ class _MainScreenState extends State<MainScreen> {
         'id': activity.id,
         'name': activity.name,
         'startedAt': activity.startedAt.millisecondsSinceEpoch,
-        'elapsedSeconds': activity.stopwatch.elapsed.inSeconds,
+        'elapsedSeconds': activity.stopwatch.elapsedBeforeSeconds,
         'running': activity.stopwatch.isRunning,
         'runningSince': activity.stopwatch.runningSince?.millisecondsSinceEpoch ?? 0,
       });
