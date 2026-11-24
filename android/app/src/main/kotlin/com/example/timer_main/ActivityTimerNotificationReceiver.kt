@@ -85,15 +85,12 @@ class ActivityTimerNotificationReceiver : BroadcastReceiver() {
 
         val namesKey = "flutter.activity_names_v1"
         val names = try {
-            val storedNames = JSONArray(flutterPrefs.getString(namesKey, "[]") ?: "[]")
-            buildSet {
-                for (i in 0 until storedNames.length()) add(storedNames.getString(i))
-            }
-        } catch (_: Exception) { emptySet() }.toMutableSet()
+            flutterPrefs.getStringSet(namesKey, emptySet())?.toMutableSet() ?: mutableSetOf()
+        } catch (_: ClassCastException) {
+            mutableSetOf()
+        }
         names.add(name)
-        val namesJson = JSONArray()
-        names.sorted().forEach { namesJson.put(it) }
-        editor.putString(namesKey, namesJson.toString()).apply()
+        editor.putStringSet(namesKey, names).apply()
     }
 
     private fun jalaliDate(date: Date): String {
