@@ -867,11 +867,6 @@ class _MainScreenState extends State<MainScreen> {
       });
     }
 
-    if (!_activityNames.any((item) => item.toLowerCase() == name.toLowerCase())) {
-      _activityNames.add(name);
-      _activityNames.sort();
-      await _persistActivityNames();
-    }
     await _persistRunningActivities();
     await _syncActivityNotification();
   }
