@@ -126,8 +126,8 @@ class ActivityTimerNotificationService : Service() {
             .setShowWhen(running)
             .setUsesChronometer(running)
             .setWhen(if (running) System.currentTimeMillis() - elapsedSeconds * 1000L else 0L)
-            .addAction(action(android.R.drawable.ic_media_play, "شروع", ACTION_START, START_REQUEST_CODE))
-            .addAction(action(android.R.drawable.ic_media_pause, "مکث", ACTION_PAUSE, PAUSE_REQUEST_CODE))
+            .addAction(action(android.R.drawable.ic_media_play, "▶", ACTION_START, START_REQUEST_CODE))
+            .addAction(action(android.R.drawable.ic_media_pause, "Ⅱ", ACTION_PAUSE, PAUSE_REQUEST_CODE))
             .addAction(stopAction())
             .build()
         return notification
@@ -146,7 +146,7 @@ class ActivityTimerNotificationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
         val remoteInput = RemoteInput.Builder(ActivityTimerNotificationReceiver.KEY_ACTIVITY_NAME)
             .setLabel("نام فعالیت را وارد کن").build()
-        return Notification.Action.Builder(R.drawable.ic_notification_stop, "توقف و ثبت", pendingIntent)
+        return Notification.Action.Builder(R.drawable.ic_notification_stop, "■", pendingIntent)
             .addRemoteInput(remoteInput).setAllowGeneratedReplies(false).build()
     }
 
