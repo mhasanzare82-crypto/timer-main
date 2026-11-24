@@ -101,11 +101,12 @@ class ActivityTimerNotificationService : Service() {
             setTextViewText(R.id.notification_activity_name, title.ifBlank { "نام فعالیت" })
             val elapsedMillis = elapsedSeconds * 1000L
             val base = SystemClock.elapsedRealtime() - elapsedMillis
-            setChronometer(R.id.notification_chronometer, base, "%s", running)
-            setViewVisibility(
-                R.id.notification_chronometer,
-                android.view.View.VISIBLE
-            )
+            if (running) {
+                setChronometer(R.id.notification_chronometer, base, "%s", true)
+            } else {
+                setTextViewText(R.id.notification_chronometer, formatDuration(elapsedSeconds))
+            }
+            setViewVisibility(R.id.notification_chronometer, android.view.View.VISIBLE)
             setOnClickPendingIntent(R.id.notification_save_name, activityPendingIntent(ACTION_SAVE_NAME, SAVE_NAME_REQUEST_CODE))
             setOnClickPendingIntent(R.id.notification_delete, activityPendingIntent(ACTION_DELETE, DELETE_REQUEST_CODE))
             setOnClickPendingIntent(R.id.notification_activity_name, activityPendingIntent(ACTION_OPEN_APP, CONTENT_REQUEST_CODE))
