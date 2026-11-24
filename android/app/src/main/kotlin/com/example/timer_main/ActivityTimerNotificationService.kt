@@ -32,6 +32,9 @@ class ActivityTimerNotificationService : Service() {
             title = intent.getStringExtra(EXTRA_TITLE) ?: "آماده ثبت فعالیت جدید"
             elapsedSeconds = intent.getLongExtra(EXTRA_ELAPSED_SECONDS, 0L).coerceAtLeast(0L)
             running = intent.getBooleanExtra(EXTRA_RUNNING, false)
+            persistState()
+        } else if (intent == null) {
+            restoreState()
         }
         val notification = buildNotification()
         if (Build.VERSION.SDK_INT >= 34) {
@@ -44,6 +47,21 @@ class ActivityTimerNotificationService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
         return START_STICKY
+    }
+
+    private fun persistState() {
+        getSharedPreferences(STATE_PREFS, MODE_PRIVATE).edit()
+            .putString(KEY_TITLE, title)
+            .putLong(KEY_ELAPSED, elapsedSeconds)
+            .putBoolean(KEY_RUNNING, running)
+            .apply()
+    }
+
+    private fun restoreState() {
+        val prefs = getSharedPreferences(STATE_PREFS, MODE_PRIVATE)
+        title = prefs.getString(KEY_TITLE, "آماده ثبت فعالیت جدید") ?: "آماده ثبت فعالیت جدید"
+        elapsedSeconds = prefs.getLong(KEY_ELAPSED, 0L).coerceAtLeast(0L)
+        running = prefs.getBoolean(KEY_RUNNING, false)
     }
 
     private fun createNotificationChannel() {
@@ -135,6 +153,10 @@ class ActivityTimerNotificationService : Service() {
         const val EXTRA_ELAPSED_SECONDS = "activity_notification_elapsed_seconds"
         const val EXTRA_RUNNING = "activity_notification_running"
 
+        private const val STATE_PREFS = "activity_stopwatch_notification_state"
+        private const val KEY_TITLE = "title"
+        private const val KEY_ELAPSED = "elapsed_seconds"
+        private const val KEY_RUNNING = "running"
         private const val CHANNEL_ID = "activity_stopwatch_controls_v1"
         private const val NOTIFICATION_ID = 850010
         private const val CONTENT_REQUEST_CODE = 850011
