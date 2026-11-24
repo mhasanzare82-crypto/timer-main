@@ -19,6 +19,7 @@ class ActivityTimerNotificationService : Service() {
     private var title: String = "آماده ثبت فعالیت جدید"
     private var elapsedSeconds: Long = 0L
     private var running: Boolean = false
+    private var stateUpdatedAtMillis: Long = System.currentTimeMillis()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -32,6 +33,7 @@ class ActivityTimerNotificationService : Service() {
             title = intent.getStringExtra(EXTRA_TITLE) ?: "آماده ثبت فعالیت جدید"
             elapsedSeconds = intent.getLongExtra(EXTRA_ELAPSED_SECONDS, 0L).coerceAtLeast(0L)
             running = intent.getBooleanExtra(EXTRA_RUNNING, false)
+            stateUpdatedAtMillis = System.currentTimeMillis()
             persistState()
         } else if (intent == null) {
             restoreState()
@@ -54,6 +56,7 @@ class ActivityTimerNotificationService : Service() {
             .putString(KEY_TITLE, title)
             .putLong(KEY_ELAPSED, elapsedSeconds)
             .putBoolean(KEY_RUNNING, running)
+            .putLong(KEY_UPDATED_AT, stateUpdatedAtMillis)
             .apply()
     }
 
@@ -62,6 +65,13 @@ class ActivityTimerNotificationService : Service() {
         title = prefs.getString(KEY_TITLE, "آماده ثبت فعالیت جدید") ?: "آماده ثبت فعالیت جدید"
         elapsedSeconds = prefs.getLong(KEY_ELAPSED, 0L).coerceAtLeast(0L)
         running = prefs.getBoolean(KEY_RUNNING, false)
+        stateUpdatedAtMillis = prefs.getLong(KEY_UPDATED_AT, System.currentTimeMillis())
+        if (running) {
+            val now = System.currentTimeMillis()
+            elapsedSeconds += ((now - stateUpdatedAtMillis).coerceAtLeast(0L) / 1000L)
+            stateUpdatedAtMillis = now
+            persistState()
+        }
     }
 
     private fun createNotificationChannel() {
@@ -157,6 +167,7 @@ class ActivityTimerNotificationService : Service() {
         private const val KEY_TITLE = "title"
         private const val KEY_ELAPSED = "elapsed_seconds"
         private const val KEY_RUNNING = "running"
+        private const val KEY_UPDATED_AT = "updated_at_millis"
         private const val CHANNEL_ID = "activity_stopwatch_controls_v1"
         private const val NOTIFICATION_ID = 850010
         private const val CONTENT_REQUEST_CODE = 850011
