@@ -17,6 +17,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'apps_page.dart';
 // Daily reminders tab intentionally left blank.
 
 final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
@@ -712,7 +713,7 @@ class _MainScreenState extends State<MainScreen> {
   static const _runningActivitiesStorageKey = 'running_activities_v1';
   static const _countdownsStorageKey = 'countdown_timers_v1';
   static const _dailyRemindersStorageKey = 'daily_reminders_simple_v1';
-  static const _tabTitles = ['ثبت زمان', 'فعالیت‌ها', 'گزارش‌گیری', 'تایمر معکوس', 'یادآوری‌های روزانه'];
+  static const _tabTitles = ['ثبت زمان', 'فعالیت‌ها', 'گزارش‌گیری', 'تایمر معکوس', 'یادآوری‌های روزانه', 'اپلیکیشن‌ها'];
   static const _colors = [
     Color(0xFF356AE6),
     Color(0xFF00897B),
@@ -1702,6 +1703,7 @@ class _MainScreenState extends State<MainScreen> {
           _buildReportsPage(),
           _buildCountdownPage(),
           _buildDailyRemindersPage(),
+          const AppsPage(),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -1732,6 +1734,11 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.notifications_active_outlined),
             selectedIcon: Icon(Icons.notifications_active_rounded),
             label: 'یادآوری‌های روزانه',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.apps_outlined),
+            selectedIcon: Icon(Icons.apps_rounded),
+            label: 'اپلیکیشن‌ها',
           ),
         ],
       ),
