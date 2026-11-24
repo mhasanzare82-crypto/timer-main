@@ -124,8 +124,6 @@ class ActivityTimerNotificationService : Service() {
             .setWhen(if (running) System.currentTimeMillis() - elapsedSeconds * 1000L else 0L)
             .addAction(action(android.R.drawable.ic_media_play, "شروع", ACTION_START, START_REQUEST_CODE))
             .addAction(action(android.R.drawable.ic_media_pause, "مکث", ACTION_PAUSE, PAUSE_REQUEST_CODE))
-            .addAction(action(android.R.drawable.ic_media_play, "شروع", ACTION_START, START_REQUEST_CODE))
-            .addAction(action(android.R.drawable.ic_media_pause, "مکث", ACTION_PAUSE, PAUSE_REQUEST_CODE))
             .addAction(action(R.drawable.ic_notification_stop, "توقف", ACTION_STOP, STOP_REQUEST_CODE))
             .addAction(nameInputAction())
             .build()
