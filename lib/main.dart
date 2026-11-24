@@ -756,6 +756,8 @@ class _MainScreenState extends State<MainScreen> {
   List<String> _activityNames = [];
   Map<String, String> _activityCategories = {};
   List<String> _activityCategoryNames = [];
+  int _notificationNameTapCount = 0;
+  DateTime? _lastNotificationNameTap;
 
   @override
   void initState() {
@@ -763,8 +765,6 @@ class _MainScreenState extends State<MainScreen> {
     _activityNotificationChannel.setMethodCallHandler((call) async {
       if (call.method == 'notificationAction' && call.arguments is String) {
         await _handleActivityNotificationAction(call.arguments as String);
-      } else if (call.method == 'notificationActivityName' && call.arguments is String) {
-        await _handleNotificationActivityName(call.arguments as String);
       }
     });
     _dailyReminderPlayerCompletionSubscription = _dailyReminderPreviewPlayer.onPlayerComplete.listen((_) {
@@ -871,10 +871,43 @@ class _MainScreenState extends State<MainScreen> {
     await _syncActivityNotification();
   }
 
+  Future<void> _editNotificationActivityName() async {
+    if (!mounted) return;
+    final current = _runningActivities.isEmpty ? '' : _runningActivities.first.name;
+    final name = await _askChecklistText(
+      title: 'نام فعالیت',
+      hint: 'نام فعالیت را وارد کن',
+      initial: current,
+    );
+    if (name == null || name.trim().isEmpty || !mounted) return;
+    await _handleNotificationActivityName(name);
+  }
+
+  Future<void> _handleNotificationNameTap() async {
+    final now = DateTime.now();
+    if (_lastNotificationNameTap == null ||
+        now.difference(_lastNotificationNameTap!) > const Duration(seconds: 2)) {
+      _notificationNameTapCount = 0;
+    }
+    _lastNotificationNameTap = now;
+    _notificationNameTapCount++;
+    if (_notificationNameTapCount >= 3) {
+      _notificationNameTapCount = 0;
+      _lastNotificationNameTap = null;
+      await _editNotificationActivityName();
+    }
+  }
+
   Future<void> _handleActivityNotificationAction(String action) async {
     if (!mounted) return;
     _RunningActivity? activity = _runningActivities.isEmpty ? null : _runningActivities.first;
-    if (action == 'start') {
+    if (action == 'name_tap') {
+      await _handleNotificationNameTap();
+    } else if (action == 'edit_name') {
+      await _editNotificationActivityName();
+    } else if (action == 'open_app') {
+      return;
+    } else if (action == 'start') {
       if (activity == null) {
         final created = _RunningActivity(
           id: DateTime.now().microsecondsSinceEpoch.toString(),
