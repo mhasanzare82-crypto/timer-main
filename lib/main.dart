@@ -18,6 +18,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 // Daily reminders tab intentionally left blank.
+// Notification name editing is intentionally gated behind three consecutive taps.
 
 final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
 const MethodChannel _dailyReminderAlarmChannel = MethodChannel('timer_main/daily_reminder_alarm');
