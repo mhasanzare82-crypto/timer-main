@@ -1569,7 +1569,9 @@ class _MainScreenState extends State<MainScreen> {
     if (state['hasTimer'] != true) return null;
     final id = state['id'] as String? ?? '';
     if (id.isEmpty) return null;
-    final startedAtMs = (state['startedAt'] as num?)?.toInt() ?? DateTime.now().millisecondsSinceEpoch;
+
+    final startedAtMs = (state['startedAt'] as num?)?.toInt()
+        ?? DateTime.now().millisecondsSinceEpoch;
     final elapsedSeconds = (state['elapsedSeconds'] as num?)?.toInt() ?? 0;
     final running = state['running'] == true;
     final runningSinceMs = (state['runningSince'] as num?)?.toInt() ?? 0;
@@ -1578,9 +1580,9 @@ class _MainScreenState extends State<MainScreen> {
         : null;
     final name = state['name'] as String? ?? '';
 
-    var activity = _runningActivities.where((item) => item.id == id).firstOrNull;
-    if (activity == null) {
-      activity = _RunningActivity(
+    final existing = _runningActivities.where((item) => item.id == id).firstOrNull;
+    if (existing == null) {
+      final created = _RunningActivity(
         id: id,
         name: name,
         startedAt: DateTime.fromMillisecondsSinceEpoch(startedAtMs),
@@ -1588,27 +1590,27 @@ class _MainScreenState extends State<MainScreen> {
         runningSince: runningSince,
         isRunning: running,
       );
-      setState(() => _runningActivities.insert(0, activity!));
-      _persistRunningActivities();
-      return activity;
+      setState(() => _runningActivities.insert(0, created));
+      unawaited(_persistRunningActivities());
+      return created;
     }
 
-    final changed = activity.name != name ||
-        activity.stopwatch.isRunning != running ||
-        activity.stopwatch.elapsedBeforeSeconds != elapsedSeconds ||
-        activity.stopwatch.runningSince != runningSince;
+    final changed = existing.name != name ||
+        existing.stopwatch.isRunning != running ||
+        existing.stopwatch.elapsedBeforeSeconds != elapsedSeconds ||
+        existing.stopwatch.runningSince != runningSince;
     if (changed) {
       setState(() {
-        activity!.name = name;
-        activity.nameController.text = name;
-        activity.stopwatch.synchronize(
+        existing.name = name;
+        existing.nameController.text = name;
+        existing.stopwatch.synchronize(
           elapsedSeconds: elapsedSeconds,
           runningSince: runningSince,
         );
       });
-      _persistRunningActivities();
+      unawaited(_persistRunningActivities());
     }
-    return activity;
+    return existing;
   }
 
   Future<void> _pollActivityNotification() async {
