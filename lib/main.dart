@@ -21,6 +21,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
 const MethodChannel _dailyReminderAlarmChannel = MethodChannel('timer_main/daily_reminder_alarm');
+const MethodChannel _activityTimerChannel = MethodChannel('timer_main/activity_timer');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -328,6 +329,11 @@ class _PersistentStopwatch {
 
   int get elapsedBeforeSeconds => _elapsedBefore.inSeconds;
   DateTime? get runningSince => _runningSince;
+
+  void synchronize({required int elapsedSeconds, required DateTime? runningSince}) {
+    _elapsedBefore = Duration(seconds: elapsedSeconds < 0 ? 0 : elapsedSeconds);
+    _runningSince = runningSince;
+  }
 }
 
 class _RunningActivity {
@@ -755,6 +761,9 @@ class _MainScreenState extends State<MainScreen> {
   List<String> _activityNames = [];
   Map<String, String> _activityCategories = {};
   List<String> _activityCategoryNames = [];
+  bool _activityNotificationInitialized = false;
+  bool _activityNotificationSyncBusy = false;
+  bool _notificationStopDialogOpen = false;
 
   @override
   void initState() {
@@ -767,6 +776,7 @@ class _MainScreenState extends State<MainScreen> {
     _secondsWheelController = FixedExtentScrollController(initialItem: _wheelSeconds);
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _now = _programNow);
+      _pollActivityNotification();
     });
     _loadProgramClockSettings();
     _initializeData();
@@ -796,6 +806,7 @@ class _MainScreenState extends State<MainScreen> {
     await _loadActivityNames();
     await _loadActivityCategories();
     await _restoreRunningActivities();
+    await _initializeActivityNotification();
   }
 
   Future<void> _persistRunningActivities() async {
@@ -1295,6 +1306,7 @@ class _MainScreenState extends State<MainScreen> {
     );
     setState(() => _runningActivities.insert(0, activity));
     await _persistRunningActivities();
+    await _syncActivityNotification(activity);
   }
 
   Future<void> _createActivityTimer() async {
@@ -1305,6 +1317,7 @@ class _MainScreenState extends State<MainScreen> {
     );
     setState(() => _runningActivities.insert(0, activity));
     await _persistRunningActivities();
+    await _syncActivityNotification(activity);
   }
 
   Future<void> _saveActivityName(_RunningActivity activity) async {
@@ -1326,6 +1339,7 @@ class _MainScreenState extends State<MainScreen> {
       setState(() {});
     }
     await _persistRunningActivities();
+    await _syncActivityNotification(activity);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('نام «$name» ذخیره شد؛ تایمر همچنان فعال است.')),
@@ -1378,12 +1392,14 @@ class _MainScreenState extends State<MainScreen> {
     if (activity.stopwatch.isRunning) return;
     setState(() => activity.stopwatch.start());
     await _persistRunningActivities();
+    await _syncActivityNotification(activity);
   }
 
   Future<void> _pauseActivity(_RunningActivity activity) async {
     if (!activity.stopwatch.isRunning) return;
     setState(() => activity.stopwatch.stop());
     await _persistRunningActivities();
+    await _syncActivityNotification(activity);
   }
 
   Future<void> _deleteRunningActivity(_RunningActivity activity) async {
@@ -1413,11 +1429,67 @@ class _MainScreenState extends State<MainScreen> {
     await _persistRunningActivities();
   }
 
-  Future<void> _stopActivity(_RunningActivity activity) async {
+  Future<void> _stopActivity(
+    _RunningActivity activity, {
+    bool fromNotification = false,
+  }) async {
     activity.stopwatch.stop();
+    if (mounted) setState(() {});
+    await _persistRunningActivities();
+    if (!fromNotification) await _syncActivityNotification(activity);
+
     final endedAt = _programNow;
+    final nameController = TextEditingController(text: activity.name.trim());
+    final name = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, refreshDialog) => AlertDialog(
+            title: const Text('ثبت فعالیت'),
+            content: TextField(
+              controller: nameController,
+              autofocus: true,
+              textInputAction: TextInputAction.done,
+              decoration: const InputDecoration(
+                labelText: 'نام فعالیت',
+                hintText: 'نام فعالیت را وارد کن',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (_) => refreshDialog(() {}),
+              onSubmitted: (value) {
+                if (value.trim().isNotEmpty) Navigator.pop(dialogContext, value.trim());
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('انصراف'),
+              ),
+              FilledButton(
+                onPressed: nameController.text.trim().isEmpty
+                    ? null
+                    : () => Navigator.pop(dialogContext, nameController.text.trim()),
+                child: const Text('ذخیره'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    nameController.dispose();
+
+    if (!mounted) return;
+    if (name == null || name.trim().isEmpty) {
+      await _activityTimerChannel.invokeMethod('cancelStop');
+      await _syncActivityNotification(activity);
+      return;
+    }
+
+    final cleanName = name.trim();
+    activity.name = cleanName;
     final saved = _SavedActivity(
-      name: activity.name.trim().isEmpty ? 'فعالیت بدون نام' : activity.name.trim(),
+      name: cleanName,
       startDate: _jalaliDate(activity.startedAt),
       startTime: _clockTime(activity.startedAt),
       endDate: _jalaliDate(endedAt),
@@ -1425,6 +1497,11 @@ class _MainScreenState extends State<MainScreen> {
       durationSeconds: activity.stopwatch.elapsed.inSeconds,
     );
 
+    if (!_activityNames.any((item) => item.toLowerCase() == cleanName.toLowerCase())) {
+      _activityNames.add(cleanName);
+      _activityNames.sort();
+      await _persistActivityNames();
+    }
     setState(() {
       _runningActivities.removeWhere((item) => item.id == activity.id);
       _savedActivities.insert(0, saved);
@@ -1432,10 +1509,128 @@ class _MainScreenState extends State<MainScreen> {
     activity.dispose();
     await _persistRunningActivities();
     await _persistActivities();
-    if (!mounted) return;
+    await _activityTimerChannel.invokeMethod('finish');
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('فعالیت «${activity.name}» ذخیره شد')),
+      SnackBar(content: Text('فعالیت «$cleanName» ذخیره شد')),
     );
+  }
+
+  Future<void> _syncActivityNotification(_RunningActivity? activity) async {
+    try {
+      if (activity == null) {
+        await _activityTimerChannel.invokeMethod('show');
+        return;
+      }
+      await _activityTimerChannel.invokeMethod('sync', {
+        'hasTimer': true,
+        'id': activity.id,
+        'name': activity.name,
+        'startedAt': activity.startedAt.millisecondsSinceEpoch,
+        'elapsedSeconds': activity.stopwatch.elapsed.inSeconds,
+        'running': activity.stopwatch.isRunning,
+        'runningSince': activity.stopwatch.runningSince?.millisecondsSinceEpoch ?? 0,
+      });
+    } on PlatformException catch (error) {
+      debugPrint('Activity notification sync failed: ${error.message}');
+    } catch (error) {
+      debugPrint('Activity notification sync failed: $error');
+    }
+  }
+
+  Future<void> _initializeActivityNotification() async {
+    try {
+      final state = await _activityTimerChannel.invokeMapMethod<String, dynamic>('getState');
+      if (state != null && state['hasTimer'] == true) {
+        final activity = _applyNotificationActivityState(state);
+        _activityNotificationInitialized = true;
+        if (state['pendingStop'] == true && activity != null) {
+          await _handleNotificationStop(activity);
+        }
+        return;
+      }
+      final current = _runningActivities.where((item) => item.stopwatch.isRunning).firstOrNull
+          ?? (_runningActivities.isNotEmpty ? _runningActivities.first : null);
+      await _syncActivityNotification(current);
+    } catch (error) {
+      debugPrint('Activity notification initialization failed: $error');
+      try {
+        await _activityTimerChannel.invokeMethod('show');
+      } catch (_) {}
+    }
+    _activityNotificationInitialized = true;
+  }
+
+  _RunningActivity? _applyNotificationActivityState(Map<String, dynamic> state) {
+    if (state['hasTimer'] != true) return null;
+    final id = state['id'] as String? ?? '';
+    if (id.isEmpty) return null;
+    final startedAtMs = (state['startedAt'] as num?)?.toInt() ?? DateTime.now().millisecondsSinceEpoch;
+    final elapsedSeconds = (state['elapsedSeconds'] as num?)?.toInt() ?? 0;
+    final running = state['running'] == true;
+    final runningSinceMs = (state['runningSince'] as num?)?.toInt() ?? 0;
+    final runningSince = running && runningSinceMs > 0
+        ? DateTime.fromMillisecondsSinceEpoch(runningSinceMs)
+        : null;
+    final name = state['name'] as String? ?? '';
+
+    var activity = _runningActivities.where((item) => item.id == id).firstOrNull;
+    if (activity == null) {
+      activity = _RunningActivity(
+        id: id,
+        name: name,
+        startedAt: DateTime.fromMillisecondsSinceEpoch(startedAtMs),
+        elapsedSeconds: elapsedSeconds,
+        runningSince: runningSince,
+        isRunning: running,
+      );
+      setState(() => _runningActivities.insert(0, activity!));
+      _persistRunningActivities();
+      return activity;
+    }
+
+    final changed = activity.name != name ||
+        activity.stopwatch.isRunning != running ||
+        activity.stopwatch.elapsedBeforeSeconds != elapsedSeconds ||
+        activity.stopwatch.runningSince != runningSince;
+    if (changed) {
+      setState(() {
+        activity!.name = name;
+        activity.nameController.text = name;
+        activity.stopwatch.synchronize(
+          elapsedSeconds: elapsedSeconds,
+          runningSince: runningSince,
+        );
+      });
+      _persistRunningActivities();
+    }
+    return activity;
+  }
+
+  Future<void> _pollActivityNotification() async {
+    if (!_activityNotificationInitialized || _activityNotificationSyncBusy || !mounted) return;
+    _activityNotificationSyncBusy = true;
+    try {
+      final state = await _activityTimerChannel.invokeMapMethod<String, dynamic>('getState');
+      if (state == null || !mounted) return;
+      final activity = _applyNotificationActivityState(state);
+      if (state['pendingStop'] == true && activity != null && !_notificationStopDialogOpen) {
+        await _handleNotificationStop(activity);
+      }
+    } catch (error) {
+      debugPrint('Activity notification polling failed: $error');
+    } finally {
+      _activityNotificationSyncBusy = false;
+    }
+  }
+
+  Future<void> _handleNotificationStop(_RunningActivity activity) async {
+    if (_notificationStopDialogOpen || !mounted) return;
+    _notificationStopDialogOpen = true;
+    try {
+      await _stopActivity(activity, fromNotification: true);
+    } finally {
+      _notificationStopDialogOpen = false;
+    }
   }
 
   Future<void> _loadProgramClockSettings() async {
