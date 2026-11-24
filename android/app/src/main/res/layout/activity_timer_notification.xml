@@ -4,58 +4,78 @@
     android:layout_height="wrap_content"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingStart="8dp"
-    android:paddingEnd="8dp"
-    android:paddingTop="6dp"
-    android:paddingBottom="6dp">
+    android:paddingStart="6dp"
+    android:paddingEnd="6dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
 
     <TextView
-        android:id="@+id/notification_stop"
-        android:layout_width="40dp"
+        android:id="@+id/notification_save_name"
+        android:layout_width="34dp"
         android:layout_height="44dp"
         android:gravity="center"
-        android:text="⏹️"
-        android:textSize="22sp"
-        android:contentDescription="توقف و ثبت" />
+        android:text="💾"
+        android:textSize="19sp"
+        android:contentDescription="ذخیره نام فعالیت" />
 
     <TextView
-        android:id="@+id/notification_pause"
-        android:layout_width="40dp"
+        android:id="@+id/notification_delete"
+        android:layout_width="30dp"
         android:layout_height="44dp"
         android:gravity="center"
-        android:text="⏸️"
-        android:textSize="22sp"
-        android:contentDescription="مکث" />
-
-    <TextView
-        android:id="@+id/notification_start"
-        android:layout_width="40dp"
-        android:layout_height="44dp"
-        android:gravity="center"
-        android:text="▶️"
-        android:textSize="22sp"
-        android:contentDescription="شروع" />
+        android:text="🗑"
+        android:textSize="18sp"
+        android:contentDescription="حذف فعالیت" />
 
     <TextView
         android:id="@+id/notification_activity_name"
         android:layout_width="0dp"
         android:layout_height="44dp"
-        android:layout_weight="1"
+        android:layout_weight="5"
         android:gravity="center_vertical"
-        android:paddingStart="6dp"
-        android:paddingEnd="6dp"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
         android:singleLine="true"
         android:ellipsize="end"
         android:text="نام فعالیت"
-        android:textSize="14sp"
-        android:contentDescription="برای ویرایش نام سه بار لمس کن" />
+        android:textSize="13sp"
+        android:contentDescription="نام فعالیت؛ برای ویرایش برنامه را باز کن" />
+
+    <Chronometer
+        android:id="@+id/notification_chronometer"
+        android:layout_width="0dp"
+        android:layout_height="44dp"
+        android:layout_weight="3"
+        android:gravity="center"
+        android:format="%s"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:contentDescription="زمان سپری شده" />
 
     <TextView
-        android:id="@+id/notification_save_name"
-        android:layout_width="40dp"
+        android:id="@+id/notification_start"
+        android:layout_width="34dp"
         android:layout_height="44dp"
         android:gravity="center"
-        android:text="💾"
-        android:textSize="21sp"
-        android:contentDescription="ویرایش و ذخیره نام" />
+        android:text="▶️"
+        android:textSize="20sp"
+        android:contentDescription="شروع" />
+
+    <TextView
+        android:id="@+id/notification_pause"
+        android:layout_width="34dp"
+        android:layout_height="44dp"
+        android:gravity="center"
+        android:text="⏸️"
+        android:textSize="20sp"
+        android:contentDescription="مکث" />
+
+    <TextView
+        android:id="@+id/notification_stop"
+        android:layout_width="34dp"
+        android:layout_height="44dp"
+        android:gravity="center"
+        android:text="⏹️"
+        android:textSize="20sp"
+        android:contentDescription="توقف و ثبت" />
 </LinearLayout>
