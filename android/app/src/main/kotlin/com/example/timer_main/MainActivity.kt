@@ -1,6 +1,5 @@
 package com.example.timer_main
 
-import android.app.RemoteInput
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -61,7 +60,7 @@ class MainActivity : FlutterFragmentActivity() {
             try {
                 when (call.method) {
                     "update" -> {
-                        val title = call.argument<String>("title") ?: "آماده ثبت فعالیت جدید"
+                        val title = call.argument<String>("title") ?: "نام فعالیت"
                         val elapsedSeconds = call.argument<Number>("elapsedSeconds")?.toLong() ?: 0L
                         val running = call.argument<Boolean>("running") ?: false
                         val serviceIntent = Intent(this, ActivityTimerNotificationService::class.java).apply {
@@ -77,17 +76,15 @@ class MainActivity : FlutterFragmentActivity() {
                         }
                         result.success(true)
                     }
+                    "stop" -> {
+                        stopService(Intent(this, ActivityTimerNotificationService::class.java))
+                        result.success(true)
+                    }
                     "consumePendingAction" -> {
                         val prefs = getSharedPreferences(ACTIVITY_NOTIFICATION_PREFS, MODE_PRIVATE)
                         val action = prefs.getString(PENDING_ACTION_KEY, null)
                         prefs.edit().remove(PENDING_ACTION_KEY).apply()
                         result.success(action)
-                    }
-                    "consumePendingActivityName" -> {
-                        val prefs = getSharedPreferences(ACTIVITY_NOTIFICATION_PREFS, MODE_PRIVATE)
-                        val name = prefs.getString(PENDING_ACTIVITY_NAME_KEY, null)
-                        prefs.edit().remove(PENDING_ACTIVITY_NAME_KEY).apply()
-                        result.success(name)
                     }
                     else -> result.notImplemented()
                 }
@@ -104,54 +101,14 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        val activityName = readNotificationActivityName(intent)
-        val channel = activityNotificationChannel
-        if (activityName != null) {
-            if (channel != null) {
-                channel.invokeMethod("notificationActivityName", activityName)
-            } else {
-                storeNotificationActivityName(intent)
-            }
-        }
         val action = intent.getStringExtra(EXTRA_NOTIFICATION_ACTION) ?: return
-        if (channel != null) {
-            channel.invokeMethod("notificationAction", action)
-        } else {
-            storeNotificationAction(intent)
-        }
-    }
-
-    private fun readNotificationActivityName(source: Intent?): String? {
-        if (source == null) return null
-        return RemoteInput.getResultsFromIntent(source)
-            ?.getCharSequence(ActivityTimerNotificationService.EXTRA_ACTIVITY_NAME)
-            ?.toString()
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-    }
-
-    private fun storeNotificationActivityName(source: Intent?) {
-        val name = readNotificationActivityName(source) ?: return
-        getSharedPreferences(ACTIVITY_NOTIFICATION_PREFS, MODE_PRIVATE)
-            .edit()
-            .putString(PENDING_ACTIVITY_NAME_KEY, name)
-            .apply()
-    }
-
-    private fun storeNotificationAction(source: Intent?): String? {
-        val action = source?.getStringExtra(EXTRA_NOTIFICATION_ACTION) ?: return null
-        getSharedPreferences(ACTIVITY_NOTIFICATION_PREFS, MODE_PRIVATE)
-            .edit()
-            .putString(PENDING_ACTION_KEY, action)
-            .apply()
-        return action
+        activityNotificationChannel?.invokeMethod("notificationAction", action)
     }
 
     companion object {
         private const val ACTIVITY_NOTIFICATION_CHANNEL = "timer_main/activity_notification"
         private const val ACTIVITY_NOTIFICATION_PREFS = "activity_notification_actions"
         private const val PENDING_ACTION_KEY = "pending_action"
-        private const val PENDING_ACTIVITY_NAME_KEY = "pending_activity_name"
         const val EXTRA_NOTIFICATION_ACTION = "activity_notification_action"
     }
 }
