@@ -832,6 +832,7 @@ class _MainScreenState extends State<MainScreen> {
             : activity.name.trim(),
         'elapsedSeconds': activity?.stopwatch.elapsed.inSeconds ?? 0,
         'running': activity?.stopwatch.isRunning ?? false,
+        'startedAtMillis': activity?.startedAt.millisecondsSinceEpoch ?? 0,
       });
     } on PlatformException catch (error) {
       debugPrint('Activity notification update failed: ${error.message}');
