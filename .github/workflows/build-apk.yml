@@ -9,6 +9,7 @@ on:
     branches:
       - main
       - feature/daily-reminders
+      - feature/notification-activity-name
     paths:
       - 'lib/**'
       - 'android/**'

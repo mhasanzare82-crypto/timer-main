@@ -18,6 +18,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 // Daily reminders tab intentionally left blank.
+// Notification name editing is intentionally gated behind three consecutive taps.
 
 final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
 const MethodChannel _dailyReminderAlarmChannel = MethodChannel('timer_main/daily_reminder_alarm');
@@ -826,12 +827,14 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _syncActivityNotification() async {
     final activity = _runningActivities.isEmpty ? null : _runningActivities.first;
     try {
+      if (activity == null) {
+        await _activityNotificationChannel.invokeMethod<void>('stop');
+        return;
+      }
       await _activityNotificationChannel.invokeMethod<void>('update', {
-        'title': activity == null || activity.name.trim().isEmpty
-            ? 'آماده ثبت فعالیت جدید'
-            : activity.name.trim(),
-        'elapsedSeconds': activity?.stopwatch.elapsed.inSeconds ?? 0,
-        'running': activity?.stopwatch.isRunning ?? false,
+        'title': activity.name.trim().isEmpty ? 'نام فعالیت' : activity.name.trim(),
+        'elapsedSeconds': activity.stopwatch.elapsed.inSeconds,
+        'running': activity.stopwatch.isRunning,
       });
     } on PlatformException catch (error) {
       debugPrint('Activity notification update failed: ${error.message}');
@@ -843,7 +846,13 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _handleActivityNotificationAction(String action) async {
     if (!mounted) return;
     _RunningActivity? activity = _runningActivities.isEmpty ? null : _runningActivities.first;
-    if (action == 'start') {
+    if (action == 'open_app') {
+      setState(() => _selectedIndex = 0);
+    } else if (action == 'save_name' && activity != null) {
+      await _saveActivityName(activity);
+    } else if (action == 'delete' && activity != null) {
+      await _deleteRunningActivity(activity);
+    } else if (action == 'start') {
       if (activity == null) {
         final created = _RunningActivity(
           id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -1487,56 +1496,28 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _stopActivity(_RunningActivity activity) async {
-    var enteredName = activity.nameController.text.trim();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('ثبت فعالیت'),
-        content: TextFormField(
-          initialValue: enteredName,
-          autofocus: true,
-          maxLength: 60,
-          textInputAction: TextInputAction.done,
-          decoration: const InputDecoration(
-            labelText: 'نام فعالیت',
-            hintText: 'نام این فعالیت را وارد کن',
-            border: OutlineInputBorder(),
-          ),
-          onChanged: (value) => enteredName = value,
-          onFieldSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('انصراف'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, enteredName.trim()),
-            child: const Text('ذخیره'),
-          ),
-        ],
-      ),
-    );
-    if (!mounted || name == null) return;
-    if (name.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('برای ذخیره فعالیت، نام آن را وارد کن.')),
-      );
+    final name = activity.nameController.text.trim();
+    if (name.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ابتدا نام فعالیت را از نوار اعلان وارد کن.')),
+        );
+      }
+      await _syncActivityNotification();
       return;
     }
 
-    activity.name = name.trim();
-    if (!_activityNames.any((item) => item.toLowerCase() == activity.name.toLowerCase())) {
-      setState(() {
-        _activityNames.add(activity.name);
-        _activityNames.sort();
-      });
+    activity.name = name;
+    if (!_activityNames.any((item) => item.toLowerCase() == name.toLowerCase())) {
+      _activityNames.add(name);
+      _activityNames.sort();
       await _persistActivityNames();
     }
+
     activity.stopwatch.stop();
     final endedAt = _programNow;
     final saved = _SavedActivity(
-      name: activity.name,
+      name: name,
       startDate: _jalaliDate(activity.startedAt),
       startTime: _clockTime(activity.startedAt),
       endDate: _jalaliDate(endedAt),
@@ -1554,7 +1535,7 @@ class _MainScreenState extends State<MainScreen> {
     await _syncActivityNotification();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('فعالیت «${activity.name}» ذخیره شد')),
+      SnackBar(content: Text('فعالیت «$name» ذخیره شد')),
     );
   }
 

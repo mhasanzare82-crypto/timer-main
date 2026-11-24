@@ -10,6 +10,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
+import android.widget.RemoteViews
 
 /**
  * Keeps the activity stopwatch controls visible while the Flutter UI is in the background.
@@ -91,55 +92,53 @@ class ActivityTimerNotificationService : Service() {
     }
 
     private fun buildNotification(): Notification {
-        val contentIntent = PendingIntent.getActivity(
-            this,
-            CONTENT_REQUEST_CODE,
-            Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val remote = RemoteViews(packageName, R.layout.activity_timer_notification).apply {
+            setTextViewText(R.id.notification_activity_name, title.ifBlank { "نام فعالیت" })
+            val elapsedMillis = elapsedSeconds * 1000L
+            val base = SystemClock.elapsedRealtime() - elapsedMillis
+            if (running) {
+                setChronometer(R.id.notification_chronometer, base, "%s", true)
+            } else {
+                setTextViewText(R.id.notification_chronometer, formatDuration(elapsedSeconds))
+            }
+            setViewVisibility(R.id.notification_chronometer, android.view.View.VISIBLE)
+            setOnClickPendingIntent(R.id.notification_save_name, activityPendingIntent(ACTION_SAVE_NAME, SAVE_NAME_REQUEST_CODE))
+            setOnClickPendingIntent(R.id.notification_delete, activityPendingIntent(ACTION_DELETE, DELETE_REQUEST_CODE))
+            setOnClickPendingIntent(R.id.notification_activity_name, activityPendingIntent(ACTION_OPEN_APP, CONTENT_REQUEST_CODE))
+            setOnClickPendingIntent(R.id.notification_start, activityPendingIntent(ACTION_START, START_REQUEST_CODE))
+            setOnClickPendingIntent(R.id.notification_pause, activityPendingIntent(ACTION_PAUSE, PAUSE_REQUEST_CODE))
+            setOnClickPendingIntent(R.id.notification_stop, activityPendingIntent(ACTION_STOP, STOP_REQUEST_CODE))
+        }
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
         } else {
             Notification.Builder(this)
         }
-
-        val notification = builder
+        return builder
             .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle(title)
-            .setContentText(
-                if (running) "زمان فعالیت در حال سپری شدن است"
-                else if (elapsedSeconds > 0L) "زمان سپری‌شده: ${formatDuration(elapsedSeconds)}"
-                else "برای ثبت فعالیت جدید، شروع را بزن"
-            )
-            .setContentIntent(contentIntent)
+            .setContentTitle("Timer")
+            .setContentText(null)
+            .setCustomContentView(remote)
+            .setCustomBigContentView(remote)
             .setCategory(Notification.CATEGORY_STOPWATCH)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setShowWhen(running)
-            .setUsesChronometer(running)
-            .setWhen(if (running) System.currentTimeMillis() - elapsedSeconds * 1000L else 0L)
-            .addAction(action(android.R.drawable.ic_media_play, "شروع", ACTION_START, START_REQUEST_CODE))
-            .addAction(action(android.R.drawable.ic_media_pause, "مکث", ACTION_PAUSE, PAUSE_REQUEST_CODE))
-            .addAction(action(R.drawable.ic_notification_stop, "توقف", ACTION_STOP, STOP_REQUEST_CODE))
+            .setShowWhen(false)
             .build()
-        return notification
     }
 
-    private fun action(icon: Int, label: String, action: String, requestCode: Int): Notification.Action {
+    private fun activityPendingIntent(action: String, requestCode: Int): PendingIntent {
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra(MainActivity.EXTRA_NOTIFICATION_ACTION, action)
         }
-        val pendingIntent = PendingIntent.getActivity(
+        return PendingIntent.getActivity(
             this,
             requestCode,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        return Notification.Action.Builder(icon, label, pendingIntent).build()
     }
 
     private fun formatDuration(seconds: Long): String {
@@ -159,6 +158,9 @@ class ActivityTimerNotificationService : Service() {
         const val ACTION_START = "start"
         const val ACTION_PAUSE = "pause"
         const val ACTION_STOP = "stop"
+        const val ACTION_OPEN_APP = "open_app"
+        const val ACTION_SAVE_NAME = "save_name"
+        const val ACTION_DELETE = "delete"
         const val EXTRA_TITLE = "activity_notification_title"
         const val EXTRA_ELAPSED_SECONDS = "activity_notification_elapsed_seconds"
         const val EXTRA_RUNNING = "activity_notification_running"
@@ -174,5 +176,7 @@ class ActivityTimerNotificationService : Service() {
         private const val START_REQUEST_CODE = 850012
         private const val PAUSE_REQUEST_CODE = 850013
         private const val STOP_REQUEST_CODE = 850014
+        private const val SAVE_NAME_REQUEST_CODE = 850017
+        private const val DELETE_REQUEST_CODE = 850018
     }
 }

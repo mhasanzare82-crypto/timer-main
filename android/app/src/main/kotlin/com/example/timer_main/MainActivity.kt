@@ -60,7 +60,7 @@ class MainActivity : FlutterFragmentActivity() {
             try {
                 when (call.method) {
                     "update" -> {
-                        val title = call.argument<String>("title") ?: "آماده ثبت فعالیت جدید"
+                        val title = call.argument<String>("title") ?: "نام فعالیت"
                         val elapsedSeconds = call.argument<Number>("elapsedSeconds")?.toLong() ?: 0L
                         val running = call.argument<Boolean>("running") ?: false
                         val serviceIntent = Intent(this, ActivityTimerNotificationService::class.java).apply {
@@ -76,6 +76,10 @@ class MainActivity : FlutterFragmentActivity() {
                         }
                         result.success(true)
                     }
+                    "stop" -> {
+                        stopService(Intent(this, ActivityTimerNotificationService::class.java))
+                        result.success(true)
+                    }
                     "consumePendingAction" -> {
                         val prefs = getSharedPreferences(ACTIVITY_NOTIFICATION_PREFS, MODE_PRIVATE)
                         val action = prefs.getString(PENDING_ACTION_KEY, null)
@@ -89,29 +93,27 @@ class MainActivity : FlutterFragmentActivity() {
             }
         }
 
-        // Handles a notification action that launched the app from a cold start.
+        // Preserve notification actions received before the Flutter channel is ready.
         storeNotificationAction(intent)
+    }
+
+    private fun storeNotificationAction(source: Intent?) {
+        val action = source?.getStringExtra(EXTRA_NOTIFICATION_ACTION) ?: return
+        getSharedPreferences(ACTIVITY_NOTIFICATION_PREFS, MODE_PRIVATE)
+            .edit()
+            .putString(PENDING_ACTION_KEY, action)
+            .apply()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         val action = intent.getStringExtra(EXTRA_NOTIFICATION_ACTION) ?: return
-        val channel = activityNotificationChannel
-        if (channel != null) {
-            channel.invokeMethod("notificationAction", action)
+        if (activityNotificationChannel != null) {
+            activityNotificationChannel?.invokeMethod("notificationAction", action)
         } else {
             storeNotificationAction(intent)
         }
-    }
-
-    private fun storeNotificationAction(source: Intent?): String? {
-        val action = source?.getStringExtra(EXTRA_NOTIFICATION_ACTION) ?: return null
-        getSharedPreferences(ACTIVITY_NOTIFICATION_PREFS, MODE_PRIVATE)
-            .edit()
-            .putString(PENDING_ACTION_KEY, action)
-            .apply()
-        return action
     }
 
     companion object {
