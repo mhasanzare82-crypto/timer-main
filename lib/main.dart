@@ -1526,6 +1526,13 @@ class _MainScreenState extends State<MainScreen> {
     }
 
     activity.name = name.trim();
+    if (!_activityNames.any((item) => item.toLowerCase() == activity.name.toLowerCase())) {
+      setState(() {
+        _activityNames.add(activity.name);
+        _activityNames.sort();
+      });
+      await _persistActivityNames();
+    }
     activity.stopwatch.stop();
     final endedAt = _programNow;
     final saved = _SavedActivity(
