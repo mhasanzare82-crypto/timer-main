@@ -8,8 +8,28 @@ import io.flutter.plugin.common.MethodChannel
 import java.util.TimeZone
 
 class MainActivity : FlutterFragmentActivity() {
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleActivityTimerIntent(intent)
+    }
+
+    private fun handleActivityTimerIntent(intent: Intent?) {
+        if (intent?.action != ActivityTimerService.ACTION_OPEN_FOR_STOP) return
+        val stopIntent = Intent(applicationContext, ActivityTimerService::class.java).apply {
+            action = ActivityTimerService.ACTION_STOP
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            applicationContext.startForegroundService(stopIntent)
+        } else {
+            applicationContext.startService(stopIntent)
+        }
+        intent.action = null
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        handleActivityTimerIntent(intent)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "timer_main/device_timezone")
             .setMethodCallHandler { call, result ->
                 if (call.method == "getLocalTimezone") {
