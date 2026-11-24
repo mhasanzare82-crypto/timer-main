@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.RemoteInput
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -20,6 +21,7 @@ class ActivityTimerNotificationService : Service() {
     private var elapsedSeconds: Long = 0L
     private var running: Boolean = false
     private var stateUpdatedAtMillis: Long = System.currentTimeMillis()
+    private var startedAtMillis: Long = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -33,6 +35,7 @@ class ActivityTimerNotificationService : Service() {
             title = intent.getStringExtra(EXTRA_TITLE) ?: "آماده ثبت فعالیت جدید"
             elapsedSeconds = intent.getLongExtra(EXTRA_ELAPSED_SECONDS, 0L).coerceAtLeast(0L)
             running = intent.getBooleanExtra(EXTRA_RUNNING, false)
+            startedAtMillis = intent.getLongExtra(EXTRA_STARTED_AT_MILLIS, 0L)
             stateUpdatedAtMillis = System.currentTimeMillis()
             persistState()
         } else if (intent == null) {
@@ -57,6 +60,7 @@ class ActivityTimerNotificationService : Service() {
             .putLong(KEY_ELAPSED, elapsedSeconds)
             .putBoolean(KEY_RUNNING, running)
             .putLong(KEY_UPDATED_AT, stateUpdatedAtMillis)
+            .putLong(KEY_STARTED_AT, startedAtMillis)
             .apply()
     }
 
@@ -66,6 +70,7 @@ class ActivityTimerNotificationService : Service() {
         elapsedSeconds = prefs.getLong(KEY_ELAPSED, 0L).coerceAtLeast(0L)
         running = prefs.getBoolean(KEY_RUNNING, false)
         stateUpdatedAtMillis = prefs.getLong(KEY_UPDATED_AT, System.currentTimeMillis())
+        startedAtMillis = prefs.getLong(KEY_STARTED_AT, 0L)
         if (running) {
             val now = System.currentTimeMillis()
             elapsedSeconds += ((now - stateUpdatedAtMillis).coerceAtLeast(0L) / 1000L)
@@ -121,25 +126,28 @@ class ActivityTimerNotificationService : Service() {
             .setShowWhen(running)
             .setUsesChronometer(running)
             .setWhen(if (running) System.currentTimeMillis() - elapsedSeconds * 1000L else 0L)
-            .addAction(action(android.R.drawable.ic_media_play, "شروع", ACTION_START, START_REQUEST_CODE))
-            .addAction(action(android.R.drawable.ic_media_pause, "مکث", ACTION_PAUSE, PAUSE_REQUEST_CODE))
-            .addAction(action(R.drawable.ic_notification_stop, "توقف", ACTION_STOP, STOP_REQUEST_CODE))
+            .addAction(action(android.R.drawable.ic_media_play, "▶", ACTION_START, START_REQUEST_CODE))
+            .addAction(action(android.R.drawable.ic_media_pause, "Ⅱ", ACTION_PAUSE, PAUSE_REQUEST_CODE))
+            .addAction(stopAction())
             .build()
         return notification
     }
 
     private fun action(icon: Int, label: String, action: String, requestCode: Int): Notification.Action {
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra(MainActivity.EXTRA_NOTIFICATION_ACTION, action)
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            requestCode,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val intent = Intent(this, ActivityTimerNotificationReceiver::class.java).apply { this.action = action }
+        val pendingIntent = PendingIntent.getBroadcast(this, requestCode, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         return Notification.Action.Builder(icon, label, pendingIntent).build()
+    }
+
+    private fun stopAction(): Notification.Action {
+        val intent = Intent(this, ActivityTimerNotificationReceiver::class.java).apply { action = ACTION_STOP }
+        val pendingIntent = PendingIntent.getBroadcast(this, STOP_REQUEST_CODE, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
+        val remoteInput = RemoteInput.Builder(ActivityTimerNotificationReceiver.KEY_ACTIVITY_NAME)
+            .setLabel("نام فعالیت را وارد کن").build()
+        return Notification.Action.Builder(R.drawable.ic_notification_stop, "■", pendingIntent)
+            .addRemoteInput(remoteInput).setAllowGeneratedReplies(false).build()
     }
 
     private fun formatDuration(seconds: Long): String {
@@ -162,12 +170,14 @@ class ActivityTimerNotificationService : Service() {
         const val EXTRA_TITLE = "activity_notification_title"
         const val EXTRA_ELAPSED_SECONDS = "activity_notification_elapsed_seconds"
         const val EXTRA_RUNNING = "activity_notification_running"
+        const val EXTRA_STARTED_AT_MILLIS = "activity_notification_started_at_millis"
 
         private const val STATE_PREFS = "activity_stopwatch_notification_state"
         private const val KEY_TITLE = "title"
         private const val KEY_ELAPSED = "elapsed_seconds"
         private const val KEY_RUNNING = "running"
         private const val KEY_UPDATED_AT = "updated_at_millis"
+        const val KEY_STARTED_AT = "started_at_millis"
         private const val CHANNEL_ID = "activity_stopwatch_controls_v1"
         private const val NOTIFICATION_ID = 850010
         private const val CONTENT_REQUEST_CODE = 850011
