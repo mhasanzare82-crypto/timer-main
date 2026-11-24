@@ -129,8 +129,7 @@ class MainActivity : FlutterFragmentActivity() {
                             val hasTimer = prefs.getBoolean(ActivityTimerService.KEY_HAS_TIMER, false)
                             val running = prefs.getBoolean(ActivityTimerService.KEY_RUNNING, false)
                             val runningSince = prefs.getLong(ActivityTimerService.KEY_RUNNING_SINCE, 0L)
-                            var elapsedMs = prefs.getLong(ActivityTimerService.KEY_ELAPSED_MS, 0L)
-                            if (running && runningSince > 0L) elapsedMs += (System.currentTimeMillis() - runningSince).coerceAtLeast(0L)
+                            val elapsedMs = prefs.getLong(ActivityTimerService.KEY_ELAPSED_MS, 0L)
                             result.success(mapOf(
                                 "hasTimer" to hasTimer,
                                 "id" to prefs.getString(ActivityTimerService.KEY_ID, "")!!,
