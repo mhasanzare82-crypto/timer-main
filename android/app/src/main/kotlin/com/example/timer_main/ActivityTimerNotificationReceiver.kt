@@ -5,7 +5,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.icu.util.PersianCalendar
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -85,22 +84,53 @@ class ActivityTimerNotificationReceiver : BroadcastReceiver() {
             .putString("flutter.running_activities_v1", "[]")
 
         val namesKey = "flutter.activity_names_v1"
-        val names = flutterPrefs.getStringSet(namesKey, emptySet())?.toMutableSet() ?: mutableSetOf()
+        val names = try {
+            val storedNames = JSONArray(flutterPrefs.getString(namesKey, "[]") ?: "[]")
+            buildSet {
+                for (i in 0 until storedNames.length()) add(storedNames.getString(i))
+            }
+        } catch (_: Exception) { emptySet() }.toMutableSet()
         names.add(name)
-        editor.putStringSet(namesKey, names).apply()
+        val namesJson = JSONArray()
+        names.sorted().forEach { namesJson.put(it) }
+        editor.putString(namesKey, namesJson.toString()).apply()
     }
 
     private fun jalaliDate(date: Date): String {
-        val calendar = PersianCalendar()
-        calendar.time = date
-        val value = String.format(
-            Locale.US, "%04d/%02d/%02d",
-            calendar.get(PersianCalendar.YEAR),
-            calendar.get(PersianCalendar.MONTH) + 1,
-            calendar.get(PersianCalendar.DAY_OF_MONTH)
-        )
-        return persianDigits(value)
+        val calendar = java.util.Calendar.getInstance().apply { time = date }
+        val gy = calendar.get(java.util.Calendar.YEAR)
+        val gm = calendar.get(java.util.Calendar.MONTH) + 1
+        val gd = calendar.get(java.util.Calendar.DAY_OF_MONTH)
+        val gDays = intArrayOf(0,31, if (isGregorianLeap(gy)) 29 else 28,31,30,31,30,31,31,30,31,30,31)
+        var gy2 = gy - 1600
+        var gm2 = gm - 1
+        val gd2 = gd - 1
+        var gNo = 365 * gy2 + (gy2 + 3) / 4 - (gy2 + 99) / 100 + (gy2 + 399) / 400
+        for (i in 0 until gm2) gNo += gDays[i + 1]
+        gNo += gd2
+        var jNo = gNo - 79
+        val jNp = jNo / 12053
+        jNo %= 12053
+        var jy = 979 + 33 * jNp + 4 * (jNo / 1461)
+        jNo %= 1461
+        if (jNo >= 366) {
+            jy += (jNo - 1) / 365
+            jNo = (jNo - 1) % 365
+        }
+        val jm: Int
+        val jd: Int
+        if (jNo < 186) {
+            jm = 1 + (jNo / 31)
+            jd = 1 + (jNo % 31)
+        } else {
+            jm = 7 + ((jNo - 186) / 30)
+            jd = 1 + ((jNo - 186) % 30)
+        }
+        return persianDigits(String.format(Locale.US, "%04d/%02d/%02d", jy, jm, jd))
     }
+
+    private fun isGregorianLeap(year: Int): Boolean =
+        year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
 
     private fun persianDigits(value: String): String {
         val digits = "۰۱۲۳۴۵۶۷۸۹"
