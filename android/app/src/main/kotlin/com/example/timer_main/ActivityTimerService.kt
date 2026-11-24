@@ -181,7 +181,7 @@ class ActivityTimerService : Service() {
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setShowWhen(false)
+            .setShowWhen(hasTimer && running)
 
         if (hasTimer && running) {
             builder.setUsesChronometer(true)
