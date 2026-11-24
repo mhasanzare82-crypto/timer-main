@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import android.widget.RemoteViews
 
 /**
@@ -91,14 +92,21 @@ class ActivityTimerNotificationService : Service() {
     }
 
     private fun buildNotification(): Notification {
-        val contentIntent = activityPendingIntent(ACTION_OPEN_APP, CONTENT_REQUEST_CODE)
         val remote = RemoteViews(packageName, R.layout.activity_timer_notification).apply {
             setTextViewText(R.id.notification_activity_name, title.ifBlank { "نام فعالیت" })
-            setOnClickPendingIntent(R.id.notification_stop, activityPendingIntent(ACTION_STOP, STOP_REQUEST_CODE))
-            setOnClickPendingIntent(R.id.notification_pause, activityPendingIntent(ACTION_PAUSE, PAUSE_REQUEST_CODE))
+            val elapsedMillis = elapsedSeconds * 1000L
+            val base = SystemClock.elapsedRealtime() - elapsedMillis
+            setChronometer(R.id.notification_chronometer, base, "%s", running)
+            setViewVisibility(
+                R.id.notification_chronometer,
+                android.view.View.VISIBLE
+            )
+            setOnClickPendingIntent(R.id.notification_save_name, activityPendingIntent(ACTION_SAVE_NAME, SAVE_NAME_REQUEST_CODE))
+            setOnClickPendingIntent(R.id.notification_delete, activityPendingIntent(ACTION_DELETE, DELETE_REQUEST_CODE))
+            setOnClickPendingIntent(R.id.notification_activity_name, activityPendingIntent(ACTION_OPEN_APP, CONTENT_REQUEST_CODE))
             setOnClickPendingIntent(R.id.notification_start, activityPendingIntent(ACTION_START, START_REQUEST_CODE))
-            setOnClickPendingIntent(R.id.notification_activity_name, activityPendingIntent(ACTION_NAME_TAP, NAME_TAP_REQUEST_CODE))
-            setOnClickPendingIntent(R.id.notification_save_name, activityPendingIntent(ACTION_EDIT_NAME, EDIT_NAME_REQUEST_CODE))
+            setOnClickPendingIntent(R.id.notification_pause, activityPendingIntent(ACTION_PAUSE, PAUSE_REQUEST_CODE))
+            setOnClickPendingIntent(R.id.notification_stop, activityPendingIntent(ACTION_STOP, STOP_REQUEST_CODE))
         }
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
@@ -111,7 +119,6 @@ class ActivityTimerNotificationService : Service() {
             .setContentText(null)
             .setCustomContentView(remote)
             .setCustomBigContentView(remote)
-            .setContentIntent(contentIntent)
             .setCategory(Notification.CATEGORY_STOPWATCH)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOngoing(true)
@@ -153,6 +160,8 @@ class ActivityTimerNotificationService : Service() {
         const val ACTION_NAME_TAP = "name_tap"
         const val ACTION_EDIT_NAME = "edit_name"
         const val ACTION_OPEN_APP = "open_app"
+        const val ACTION_SAVE_NAME = "save_name"
+        const val ACTION_DELETE = "delete"
         const val EXTRA_TITLE = "activity_notification_title"
         const val EXTRA_ELAPSED_SECONDS = "activity_notification_elapsed_seconds"
         const val EXTRA_RUNNING = "activity_notification_running"
@@ -170,6 +179,7 @@ class ActivityTimerNotificationService : Service() {
         private const val PAUSE_REQUEST_CODE = 850013
         private const val STOP_REQUEST_CODE = 850014
         private const val NAME_TAP_REQUEST_CODE = 850015
-        private const val EDIT_NAME_REQUEST_CODE = 850016
+        private const val SAVE_NAME_REQUEST_CODE = 850017
+        private const val DELETE_REQUEST_CODE = 850018
     }
 }
