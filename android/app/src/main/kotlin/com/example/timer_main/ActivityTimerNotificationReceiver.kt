@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.icu.util.PersianCalendar
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -71,20 +72,39 @@ class ActivityTimerNotificationReceiver : BroadcastReceiver() {
         val end = Date(endedAt)
         val item = JSONObject().apply {
             put("name", name)
-            put("startDate", dateFormat("yyyy/MM/dd", start))
-            put("startTime", dateFormat("HH:mm:ss", start))
-            put("endDate", dateFormat("yyyy/MM/dd", end))
-            put("endTime", dateFormat("HH:mm:ss", end))
+            put("startDate", jalaliDate(start))
+            put("startTime", persianDigits(dateFormat("HH:mm:ss", start)))
+            put("endDate", jalaliDate(end))
+            put("endTime", persianDigits(dateFormat("HH:mm:ss", end)))
             put("durationSeconds", seconds.coerceAtLeast(0L))
         }
         val updated = JSONArray().put(item)
         for (i in 0 until activities.length()) updated.put(activities.get(i))
-        val editor = flutterPrefs.edit().putString(activitiesKey, updated.toString())
+        val editor = flutterPrefs.edit()
+            .putString(activitiesKey, updated.toString())
+            .putString("flutter.running_activities_v1", "[]")
 
         val namesKey = "flutter.activity_names_v1"
         val names = flutterPrefs.getStringSet(namesKey, emptySet())?.toMutableSet() ?: mutableSetOf()
         names.add(name)
         editor.putStringSet(namesKey, names).apply()
+    }
+
+    private fun jalaliDate(date: Date): String {
+        val calendar = PersianCalendar()
+        calendar.time = date
+        val value = String.format(
+            Locale.US, "%04d/%02d/%02d",
+            calendar.get(PersianCalendar.YEAR),
+            calendar.get(PersianCalendar.MONTH) + 1,
+            calendar.get(PersianCalendar.DAY_OF_MONTH)
+        )
+        return persianDigits(value)
+    }
+
+    private fun persianDigits(value: String): String {
+        val digits = "۰۱۲۳۴۵۶۷۸۹"
+        return value.map { char -> if (char in '0'..'9') digits[char - '0'] else char }.joinToString("")
     }
 
     private fun dateFormat(pattern: String, date: Date): String =
