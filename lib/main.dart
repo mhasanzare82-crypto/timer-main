@@ -1506,6 +1506,7 @@ class _MainScreenState extends State<MainScreen> {
       _activityNames.sort();
       await _persistActivityNames();
     }
+    if (!mounted) return;
     setState(() {
       _runningActivities.removeWhere((item) => item.id == activity.id);
       _savedActivities.insert(0, saved);
@@ -1514,6 +1515,7 @@ class _MainScreenState extends State<MainScreen> {
     await _persistRunningActivities();
     await _persistActivities();
     await _activityTimerChannel.invokeMethod('finish');
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('فعالیت «$cleanName» ذخیره شد')),
     );
@@ -1544,6 +1546,7 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _initializeActivityNotification() async {
     try {
       final state = await _activityTimerChannel.invokeMapMethod<String, dynamic>('getState');
+      if (!mounted) return;
       if (state != null && state['hasTimer'] == true) {
         await _activityTimerChannel.invokeMethod('show');
         final activity = _applyNotificationActivityState(state);
@@ -1566,7 +1569,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   _RunningActivity? _applyNotificationActivityState(Map<String, dynamic> state) {
-    if (state['hasTimer'] != true) return null;
+    if (!mounted || state['hasTimer'] != true) return null;
     final id = state['id'] as String? ?? '';
     if (id.isEmpty) return null;
 
