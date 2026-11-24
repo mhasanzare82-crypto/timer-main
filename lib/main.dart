@@ -757,8 +757,6 @@ class _MainScreenState extends State<MainScreen> {
   List<String> _activityNames = [];
   Map<String, String> _activityCategories = {};
   List<String> _activityCategoryNames = [];
-  int _notificationNameTapCount = 0;
-  DateTime? _lastNotificationNameTap;
 
   @override
   void initState() {
@@ -813,10 +811,6 @@ class _MainScreenState extends State<MainScreen> {
       final androidNotifications = _notifications.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       await androidNotifications?.requestNotificationsPermission();
-      final pendingName = await _activityNotificationChannel.invokeMethod<String>('consumePendingActivityName');
-      if (pendingName != null && pendingName.trim().isNotEmpty) {
-        await _handleNotificationActivityName(pendingName);
-      }
       final pending = await _activityNotificationChannel.invokeMethod<String>('consumePendingAction');
       if (pending != null && pending.isNotEmpty) {
         await _handleActivityNotificationAction(pending);
@@ -833,12 +827,14 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _syncActivityNotification() async {
     final activity = _runningActivities.isEmpty ? null : _runningActivities.first;
     try {
+      if (activity == null) {
+        await _activityNotificationChannel.invokeMethod<void>('stop');
+        return;
+      }
       await _activityNotificationChannel.invokeMethod<void>('update', {
-        'title': activity == null || activity.name.trim().isEmpty
-            ? 'آماده ثبت فعالیت جدید'
-            : activity.name.trim(),
-        'elapsedSeconds': activity?.stopwatch.elapsed.inSeconds ?? 0,
-        'running': activity?.stopwatch.isRunning ?? false,
+        'title': activity.name.trim().isEmpty ? 'نام فعالیت' : activity.name.trim(),
+        'elapsedSeconds': activity.stopwatch.elapsed.inSeconds,
+        'running': activity.stopwatch.isRunning,
       });
     } on PlatformException catch (error) {
       debugPrint('Activity notification update failed: ${error.message}');
@@ -847,67 +843,15 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  Future<void> _handleNotificationActivityName(String rawName) async {
-    final name = rawName.trim();
-    if (name.isEmpty || !mounted) return;
-
-    _RunningActivity activity;
-    if (_runningActivities.isEmpty) {
-      activity = _RunningActivity(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        name: name,
-        startedAt: _programNow,
-        isRunning: false,
-      );
-      setState(() => _runningActivities.insert(0, activity));
-    } else {
-      activity = _runningActivities.first;
-      setState(() {
-        activity.name = name;
-        activity.nameController.text = name;
-      });
-    }
-
-    await _persistRunningActivities();
-    await _syncActivityNotification();
-  }
-
-  Future<void> _editNotificationActivityName() async {
-    if (!mounted) return;
-    final current = _runningActivities.isEmpty ? '' : _runningActivities.first.name;
-    final name = await _askChecklistText(
-      title: 'نام فعالیت',
-      hint: 'نام فعالیت را وارد کن',
-      initial: current,
-    );
-    if (name == null || name.trim().isEmpty || !mounted) return;
-    await _handleNotificationActivityName(name);
-  }
-
-  Future<void> _handleNotificationNameTap() async {
-    final now = DateTime.now();
-    if (_lastNotificationNameTap == null ||
-        now.difference(_lastNotificationNameTap!) > const Duration(seconds: 2)) {
-      _notificationNameTapCount = 0;
-    }
-    _lastNotificationNameTap = now;
-    _notificationNameTapCount++;
-    if (_notificationNameTapCount >= 3) {
-      _notificationNameTapCount = 0;
-      _lastNotificationNameTap = null;
-      await _editNotificationActivityName();
-    }
-  }
-
   Future<void> _handleActivityNotificationAction(String action) async {
     if (!mounted) return;
     _RunningActivity? activity = _runningActivities.isEmpty ? null : _runningActivities.first;
-    if (action == 'name_tap') {
-      await _handleNotificationNameTap();
-    } else if (action == 'edit_name') {
-      await _editNotificationActivityName();
-    } else if (action == 'open_app') {
-      return;
+    if (action == 'open_app') {
+      setState(() => _selectedIndex = 0);
+    } else if (action == 'save_name' && activity != null) {
+      await _saveActivityName(activity);
+    } else if (action == 'delete' && activity != null) {
+      await _deleteRunningActivity(activity);
     } else if (action == 'start') {
       if (activity == null) {
         final created = _RunningActivity(
