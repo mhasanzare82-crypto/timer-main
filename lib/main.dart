@@ -1296,7 +1296,11 @@ class _MainScreenState extends State<MainScreen> {
     if (name.trim().isEmpty) return;
     final existing = _runningActivities.where((a) => a.name.trim().toLowerCase() == name.trim().toLowerCase()).firstOrNull;
     if (existing != null) {
-      if (!existing.stopwatch.isRunning) await _startActivity(existing);
+      if (!existing.stopwatch.isRunning) {
+        await _startActivity(existing);
+      } else {
+        await _syncActivityNotification(existing);
+      }
       return;
     }
     final activity = _RunningActivity(
@@ -1541,6 +1545,7 @@ class _MainScreenState extends State<MainScreen> {
     try {
       final state = await _activityTimerChannel.invokeMapMethod<String, dynamic>('getState');
       if (state != null && state['hasTimer'] == true) {
+        await _activityTimerChannel.invokeMethod('show');
         final activity = _applyNotificationActivityState(state);
         _activityNotificationInitialized = true;
         if (state['pendingStop'] == true && activity != null) {
