@@ -177,7 +177,7 @@ class ActivityTimerService : Service() {
                 }
             )
             .setContentIntent(openIntent)
-            .setCategory(Notification.CATEGORY_STOPWATCH)
+            .setCategory("stopwatch")
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
