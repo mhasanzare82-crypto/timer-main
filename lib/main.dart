@@ -807,6 +807,9 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _initializeActivityNotification() async {
     try {
+      final androidNotifications = _notifications.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      await androidNotifications?.requestNotificationsPermission();
       final pending = await _activityNotificationChannel.invokeMethod<String>('consumePendingAction');
       if (pending != null && pending.isNotEmpty) {
         await _handleActivityNotificationAction(pending);
@@ -842,14 +845,15 @@ class _MainScreenState extends State<MainScreen> {
     _RunningActivity? activity = _runningActivities.isEmpty ? null : _runningActivities.first;
     if (action == 'start') {
       if (activity == null) {
-        activity = _RunningActivity(
+        final created = _RunningActivity(
           id: DateTime.now().microsecondsSinceEpoch.toString(),
           name: '',
           startedAt: _programNow,
           isRunning: false,
         );
-        setState(() => _runningActivities.insert(0, activity!));
+        setState(() => _runningActivities.insert(0, created));
         await _persistRunningActivities();
+        activity = created;
       }
       await _startActivity(activity);
     } else if (action == 'pause' && activity != null) {
