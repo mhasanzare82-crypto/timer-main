@@ -1,5 +1,6 @@
 package com.example.timer_main
 
+import android.app.RemoteInput
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -82,6 +83,12 @@ class MainActivity : FlutterFragmentActivity() {
                         prefs.edit().remove(PENDING_ACTION_KEY).apply()
                         result.success(action)
                     }
+                    "consumePendingActivityName" -> {
+                        val prefs = getSharedPreferences(ACTIVITY_NOTIFICATION_PREFS, MODE_PRIVATE)
+                        val name = prefs.getString(PENDING_ACTIVITY_NAME_KEY, null)
+                        prefs.edit().remove(PENDING_ACTIVITY_NAME_KEY).apply()
+                        result.success(name)
+                    }
                     else -> result.notImplemented()
                 }
             } catch (error: Exception) {
@@ -89,20 +96,46 @@ class MainActivity : FlutterFragmentActivity() {
             }
         }
 
-        // Handles a notification action that launched the app from a cold start.
+        // Handles notification interactions that launched the app from a cold start.
+        storeNotificationActivityName(intent)
         storeNotificationAction(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        val action = intent.getStringExtra(EXTRA_NOTIFICATION_ACTION) ?: return
+        val activityName = readNotificationActivityName(intent)
         val channel = activityNotificationChannel
+        if (activityName != null) {
+            if (channel != null) {
+                channel.invokeMethod("notificationActivityName", activityName)
+            } else {
+                storeNotificationActivityName(intent)
+            }
+        }
+        val action = intent.getStringExtra(EXTRA_NOTIFICATION_ACTION) ?: return
         if (channel != null) {
             channel.invokeMethod("notificationAction", action)
         } else {
             storeNotificationAction(intent)
         }
+    }
+
+    private fun readNotificationActivityName(source: Intent?): String? {
+        if (source == null) return null
+        return RemoteInput.getResultsFromIntent(source)
+            ?.getCharSequence(ActivityTimerNotificationService.EXTRA_ACTIVITY_NAME)
+            ?.toString()
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+    }
+
+    private fun storeNotificationActivityName(source: Intent?) {
+        val name = readNotificationActivityName(source) ?: return
+        getSharedPreferences(ACTIVITY_NOTIFICATION_PREFS, MODE_PRIVATE)
+            .edit()
+            .putString(PENDING_ACTIVITY_NAME_KEY, name)
+            .apply()
     }
 
     private fun storeNotificationAction(source: Intent?): String? {
@@ -118,6 +151,7 @@ class MainActivity : FlutterFragmentActivity() {
         private const val ACTIVITY_NOTIFICATION_CHANNEL = "timer_main/activity_notification"
         private const val ACTIVITY_NOTIFICATION_PREFS = "activity_notification_actions"
         private const val PENDING_ACTION_KEY = "pending_action"
+        private const val PENDING_ACTIVITY_NAME_KEY = "pending_activity_name"
         const val EXTRA_NOTIFICATION_ACTION = "activity_notification_action"
     }
 }
