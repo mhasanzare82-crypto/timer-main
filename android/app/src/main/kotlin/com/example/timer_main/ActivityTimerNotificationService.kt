@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.RemoteInput
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -123,9 +124,32 @@ class ActivityTimerNotificationService : Service() {
             .setWhen(if (running) System.currentTimeMillis() - elapsedSeconds * 1000L else 0L)
             .addAction(action(android.R.drawable.ic_media_play, "شروع", ACTION_START, START_REQUEST_CODE))
             .addAction(action(android.R.drawable.ic_media_pause, "مکث", ACTION_PAUSE, PAUSE_REQUEST_CODE))
+            .addAction(action(android.R.drawable.ic_media_play, "شروع", ACTION_START, START_REQUEST_CODE))
+            .addAction(action(android.R.drawable.ic_media_pause, "مکث", ACTION_PAUSE, PAUSE_REQUEST_CODE))
             .addAction(action(R.drawable.ic_notification_stop, "توقف", ACTION_STOP, STOP_REQUEST_CODE))
+            .addAction(nameInputAction())
             .build()
         return notification
+    }
+
+    private fun nameInputAction(): Notification.Action {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            NAME_INPUT_REQUEST_CODE,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+        )
+        val remoteInput = RemoteInput.Builder(EXTRA_ACTIVITY_NAME)
+            .setLabel("نام فعالیت را وارد کن")
+            .build()
+        return Notification.Action.Builder(
+            android.R.drawable.ic_menu_edit,
+            "نام فعالیت",
+            pendingIntent
+        ).addRemoteInput(remoteInput).setAllowGeneratedReplies(false).build()
     }
 
     private fun action(icon: Int, label: String, action: String, requestCode: Int): Notification.Action {
@@ -162,6 +186,7 @@ class ActivityTimerNotificationService : Service() {
         const val EXTRA_TITLE = "activity_notification_title"
         const val EXTRA_ELAPSED_SECONDS = "activity_notification_elapsed_seconds"
         const val EXTRA_RUNNING = "activity_notification_running"
+        const val EXTRA_ACTIVITY_NAME = "activity_notification_activity_name"
 
         private const val STATE_PREFS = "activity_stopwatch_notification_state"
         private const val KEY_TITLE = "title"
@@ -174,5 +199,6 @@ class ActivityTimerNotificationService : Service() {
         private const val START_REQUEST_CODE = 850012
         private const val PAUSE_REQUEST_CODE = 850013
         private const val STOP_REQUEST_CODE = 850014
+        private const val NAME_INPUT_REQUEST_CODE = 850015
     }
 }
