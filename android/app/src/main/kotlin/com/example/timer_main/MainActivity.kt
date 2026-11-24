@@ -93,16 +93,27 @@ class MainActivity : FlutterFragmentActivity() {
             }
         }
 
-        // Handles notification interactions that launched the app from a cold start.
-        storeNotificationActivityName(intent)
+        // Preserve notification actions received before the Flutter channel is ready.
         storeNotificationAction(intent)
+    }
+
+    private fun storeNotificationAction(source: Intent?) {
+        val action = source?.getStringExtra(EXTRA_NOTIFICATION_ACTION) ?: return
+        getSharedPreferences(ACTIVITY_NOTIFICATION_PREFS, MODE_PRIVATE)
+            .edit()
+            .putString(PENDING_ACTION_KEY, action)
+            .apply()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         val action = intent.getStringExtra(EXTRA_NOTIFICATION_ACTION) ?: return
-        activityNotificationChannel?.invokeMethod("notificationAction", action)
+        if (activityNotificationChannel != null) {
+            activityNotificationChannel?.invokeMethod("notificationAction", action)
+        } else {
+            storeNotificationAction(intent)
+        }
     }
 
     companion object {
