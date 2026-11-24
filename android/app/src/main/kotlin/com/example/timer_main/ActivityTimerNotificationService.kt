@@ -122,30 +122,30 @@ class ActivityTimerNotificationService : Service() {
             .setShowWhen(running)
             .setUsesChronometer(running)
             .setWhen(if (running) System.currentTimeMillis() - elapsedSeconds * 1000L else 0L)
-            .addAction(action(android.R.drawable.ic_media_play, "شروع", ACTION_START, START_REQUEST_CODE))
+            .addAction(startActionWithNameInput())
             .addAction(action(android.R.drawable.ic_media_pause, "مکث", ACTION_PAUSE, PAUSE_REQUEST_CODE))
             .addAction(action(R.drawable.ic_notification_stop, "توقف", ACTION_STOP, STOP_REQUEST_CODE))
-            .addAction(nameInputAction())
             .build()
         return notification
     }
 
-    private fun nameInputAction(): Notification.Action {
+    private fun startActionWithNameInput(): Notification.Action {
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(MainActivity.EXTRA_NOTIFICATION_ACTION, ACTION_START)
         }
         val pendingIntent = PendingIntent.getActivity(
             this,
-            NAME_INPUT_REQUEST_CODE,
+            START_REQUEST_CODE,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         )
         val remoteInput = RemoteInput.Builder(EXTRA_ACTIVITY_NAME)
-            .setLabel("نام فعالیت را وارد کن")
+            .setLabel("نام فعالیت را وارد کن یا تغییر بده")
             .build()
         return Notification.Action.Builder(
-            android.R.drawable.ic_menu_edit,
-            "نام فعالیت",
+            android.R.drawable.ic_media_play,
+            "شروع / نام فعالیت",
             pendingIntent
         ).addRemoteInput(remoteInput).setAllowGeneratedReplies(false).build()
     }
@@ -197,6 +197,5 @@ class ActivityTimerNotificationService : Service() {
         private const val START_REQUEST_CODE = 850012
         private const val PAUSE_REQUEST_CODE = 850013
         private const val STOP_REQUEST_CODE = 850014
-        private const val NAME_INPUT_REQUEST_CODE = 850015
     }
 }
