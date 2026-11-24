@@ -96,9 +96,12 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        val action = storeNotificationAction(intent)
-        if (action != null) {
-            activityNotificationChannel?.invokeMethod("notificationAction", action)
+        val action = intent.getStringExtra(EXTRA_NOTIFICATION_ACTION) ?: return
+        val channel = activityNotificationChannel
+        if (channel != null) {
+            channel.invokeMethod("notificationAction", action)
+        } else {
+            storeNotificationAction(intent)
         }
     }
 
