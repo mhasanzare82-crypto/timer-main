@@ -1595,14 +1595,13 @@ class _MainScreenState extends State<MainScreen> {
       return created;
     }
 
-    final changed = existing.name != name ||
-        existing.stopwatch.isRunning != running ||
+    // The activity name is edited directly in Flutter; do not overwrite an in-progress
+    // text edit with the last value mirrored to the native notification.
+    final changed = existing.stopwatch.isRunning != running ||
         existing.stopwatch.elapsedBeforeSeconds != elapsedSeconds ||
         existing.stopwatch.runningSince != runningSince;
     if (changed) {
       setState(() {
-        existing.name = name;
-        existing.nameController.text = name;
         existing.stopwatch.synchronize(
           elapsedSeconds: elapsedSeconds,
           runningSince: runningSince,
