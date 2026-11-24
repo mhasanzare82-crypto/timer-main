@@ -193,7 +193,7 @@ class ActivityTimerService : Service() {
             togglePending
         )
         if (hasTimer) {
-            builder.addAction(android.R.drawable.ic_media_stop, "توقف و ثبت", stopPending)
+            builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "توقف و ثبت", stopPending)
         }
         return builder.build()
     }
