@@ -30,11 +30,6 @@ class ActivityTimerNotificationService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_DISMISS) {
-            getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
-            stopSelf()
-            return START_NOT_STICKY
-        }
         if (intent != null && intent.action == ACTION_UPDATE) {
             title = intent.getStringExtra(EXTRA_TITLE) ?: "آماده ثبت فعالیت جدید"
             elapsedSeconds = intent.getLongExtra(EXTRA_ELAPSED_SECONDS, 0L).coerceAtLeast(0L)
@@ -160,19 +155,15 @@ class ActivityTimerNotificationService : Service() {
 
     companion object {
         const val ACTION_UPDATE = "com.example.timer_main.action.UPDATE_ACTIVITY_NOTIFICATION"
-        const val ACTION_DISMISS = "com.example.timer_main.action.DISMISS_ACTIVITY_NOTIFICATION"
         const val ACTION_START = "start"
         const val ACTION_PAUSE = "pause"
         const val ACTION_STOP = "stop"
-        const val ACTION_NAME_TAP = "name_tap"
-        const val ACTION_EDIT_NAME = "edit_name"
         const val ACTION_OPEN_APP = "open_app"
         const val ACTION_SAVE_NAME = "save_name"
         const val ACTION_DELETE = "delete"
         const val EXTRA_TITLE = "activity_notification_title"
         const val EXTRA_ELAPSED_SECONDS = "activity_notification_elapsed_seconds"
         const val EXTRA_RUNNING = "activity_notification_running"
-        const val EXTRA_ACTIVITY_NAME = "activity_notification_activity_name"
 
         private const val STATE_PREFS = "activity_stopwatch_notification_state"
         private const val KEY_TITLE = "title"
@@ -185,7 +176,6 @@ class ActivityTimerNotificationService : Service() {
         private const val START_REQUEST_CODE = 850012
         private const val PAUSE_REQUEST_CODE = 850013
         private const val STOP_REQUEST_CODE = 850014
-        private const val NAME_TAP_REQUEST_CODE = 850015
         private const val SAVE_NAME_REQUEST_CODE = 850017
         private const val DELETE_REQUEST_CODE = 850018
     }
