@@ -30,6 +30,11 @@ class ActivityTimerNotificationService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_DISMISS) {
+            getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
+            stopSelf()
+            return START_NOT_STICKY
+        }
         if (intent != null && intent.action == ACTION_UPDATE) {
             title = intent.getStringExtra(EXTRA_TITLE) ?: "آماده ثبت فعالیت جدید"
             elapsedSeconds = intent.getLongExtra(EXTRA_ELAPSED_SECONDS, 0L).coerceAtLeast(0L)
@@ -154,6 +159,7 @@ class ActivityTimerNotificationService : Service() {
 
     companion object {
         const val ACTION_UPDATE = "com.example.timer_main.action.UPDATE_ACTIVITY_NOTIFICATION"
+        const val ACTION_DISMISS = "com.example.timer_main.action.DISMISS_ACTIVITY_NOTIFICATION"
         const val ACTION_START = "start"
         const val ACTION_PAUSE = "pause"
         const val ACTION_STOP = "stop"
