@@ -21,6 +21,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
 const MethodChannel _dailyReminderAlarmChannel = MethodChannel('timer_main/daily_reminder_alarm');
+const MethodChannel _activityNotificationChannel = MethodChannel('timer_main/activity_notification');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -759,6 +760,11 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    _activityNotificationChannel.setMethodCallHandler((call) async {
+      if (call.method == 'notificationAction' && call.arguments is String) {
+        await _handleActivityNotificationAction(call.arguments as String);
+      }
+    });
     _dailyReminderPlayerCompletionSubscription = _dailyReminderPreviewPlayer.onPlayerComplete.listen((_) {
       if (mounted && _playingDailyReminderId != null) setState(() => _playingDailyReminderId = null);
     });
@@ -796,6 +802,63 @@ class _MainScreenState extends State<MainScreen> {
     await _loadActivityNames();
     await _loadActivityCategories();
     await _restoreRunningActivities();
+    await _initializeActivityNotification();
+  }
+
+  Future<void> _initializeActivityNotification() async {
+    try {
+      final pending = await _activityNotificationChannel.invokeMethod<String>('consumePendingAction');
+      if (pending != null && pending.isNotEmpty) {
+        await _handleActivityNotificationAction(pending);
+      } else {
+        await _syncActivityNotification();
+      }
+    } on PlatformException catch (error) {
+      debugPrint('Activity notification initialization failed: ${error.message}');
+    } on MissingPluginException {
+      // Native notification controls are available on Android only.
+    }
+  }
+
+  Future<void> _syncActivityNotification() async {
+    final activity = _runningActivities.isEmpty ? null : _runningActivities.first;
+    try {
+      await _activityNotificationChannel.invokeMethod<void>('update', {
+        'title': activity == null || activity.name.trim().isEmpty
+            ? 'آماده ثبت فعالیت جدید'
+            : activity.name.trim(),
+        'elapsedSeconds': activity?.stopwatch.elapsed.inSeconds ?? 0,
+        'running': activity?.stopwatch.isRunning ?? false,
+      });
+    } on PlatformException catch (error) {
+      debugPrint('Activity notification update failed: ${error.message}');
+    } on MissingPluginException {
+      // Native notification controls are available on Android only.
+    }
+  }
+
+  Future<void> _handleActivityNotificationAction(String action) async {
+    if (!mounted) return;
+    _RunningActivity? activity = _runningActivities.isEmpty ? null : _runningActivities.first;
+    if (action == 'start') {
+      if (activity == null) {
+        activity = _RunningActivity(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          name: '',
+          startedAt: _programNow,
+          isRunning: false,
+        );
+        setState(() => _runningActivities.insert(0, activity!));
+        await _persistRunningActivities();
+      }
+      await _startActivity(activity);
+    } else if (action == 'pause' && activity != null) {
+      await _pauseActivity(activity);
+    } else if (action == 'stop' && activity != null) {
+      await _stopActivity(activity);
+    } else {
+      await _syncActivityNotification();
+    }
   }
 
   Future<void> _persistRunningActivities() async {
@@ -1295,6 +1358,7 @@ class _MainScreenState extends State<MainScreen> {
     );
     setState(() => _runningActivities.insert(0, activity));
     await _persistRunningActivities();
+    await _syncActivityNotification();
   }
 
   Future<void> _createActivityTimer() async {
@@ -1305,6 +1369,7 @@ class _MainScreenState extends State<MainScreen> {
     );
     setState(() => _runningActivities.insert(0, activity));
     await _persistRunningActivities();
+    await _syncActivityNotification();
   }
 
   Future<void> _saveActivityName(_RunningActivity activity) async {
@@ -1326,6 +1391,7 @@ class _MainScreenState extends State<MainScreen> {
       setState(() {});
     }
     await _persistRunningActivities();
+    await _syncActivityNotification();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('نام «$name» ذخیره شد؛ تایمر همچنان فعال است.')),
@@ -1378,12 +1444,14 @@ class _MainScreenState extends State<MainScreen> {
     if (activity.stopwatch.isRunning) return;
     setState(() => activity.stopwatch.start());
     await _persistRunningActivities();
+    await _syncActivityNotification();
   }
 
   Future<void> _pauseActivity(_RunningActivity activity) async {
     if (!activity.stopwatch.isRunning) return;
     setState(() => activity.stopwatch.stop());
     await _persistRunningActivities();
+    await _syncActivityNotification();
   }
 
   Future<void> _deleteRunningActivity(_RunningActivity activity) async {
@@ -1409,15 +1477,55 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {
       _runningActivities.removeWhere((item) => item.id == activity.id);
     });
-    activity.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) => activity.dispose());
     await _persistRunningActivities();
+    await _syncActivityNotification();
   }
 
   Future<void> _stopActivity(_RunningActivity activity) async {
+    var enteredName = activity.nameController.text.trim();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('ثبت فعالیت'),
+        content: TextFormField(
+          initialValue: enteredName,
+          autofocus: true,
+          maxLength: 60,
+          textInputAction: TextInputAction.done,
+          decoration: const InputDecoration(
+            labelText: 'نام فعالیت',
+            hintText: 'نام این فعالیت را وارد کن',
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (value) => enteredName = value,
+          onFieldSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, enteredName.trim()),
+            child: const Text('ذخیره'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || name == null) return;
+    if (name.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('برای ذخیره فعالیت، نام آن را وارد کن.')),
+      );
+      return;
+    }
+
+    activity.name = name.trim();
     activity.stopwatch.stop();
     final endedAt = _programNow;
     final saved = _SavedActivity(
-      name: activity.name.trim().isEmpty ? 'فعالیت بدون نام' : activity.name.trim(),
+      name: activity.name,
       startDate: _jalaliDate(activity.startedAt),
       startTime: _clockTime(activity.startedAt),
       endDate: _jalaliDate(endedAt),
@@ -1429,9 +1537,10 @@ class _MainScreenState extends State<MainScreen> {
       _runningActivities.removeWhere((item) => item.id == activity.id);
       _savedActivities.insert(0, saved);
     });
-    activity.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) => activity.dispose());
     await _persistRunningActivities();
     await _persistActivities();
+    await _syncActivityNotification();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('فعالیت «${activity.name}» ذخیره شد')),
