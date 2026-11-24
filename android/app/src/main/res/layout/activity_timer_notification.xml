@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp">
+
+    <TextView
+        android:id="@+id/notification_stop"
+        android:layout_width="40dp"
+        android:layout_height="44dp"
+        android:gravity="center"
+        android:text="⏹️"
+        android:textSize="22sp"
+        android:contentDescription="توقف و ثبت" />
+
+    <TextView
+        android:id="@+id/notification_pause"
+        android:layout_width="40dp"
+        android:layout_height="44dp"
+        android:gravity="center"
+        android:text="⏸️"
+        android:textSize="22sp"
+        android:contentDescription="مکث" />
+
+    <TextView
+        android:id="@+id/notification_start"
+        android:layout_width="40dp"
+        android:layout_height="44dp"
+        android:gravity="center"
+        android:text="▶️"
+        android:textSize="22sp"
+        android:contentDescription="شروع" />
+
+    <TextView
+        android:id="@+id/notification_activity_name"
+        android:layout_width="0dp"
+        android:layout_height="44dp"
+        android:layout_weight="1"
+        android:gravity="center_vertical"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:text="نام فعالیت"
+        android:textSize="14sp"
+        android:contentDescription="برای ویرایش نام سه بار لمس کن" />
+
+    <TextView
+        android:id="@+id/notification_save_name"
+        android:layout_width="40dp"
+        android:layout_height="44dp"
+        android:gravity="center"
+        android:text="💾"
+        android:textSize="21sp"
+        android:contentDescription="ویرایش و ذخیره نام" />
+</LinearLayout>
